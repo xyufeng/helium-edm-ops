@@ -274,7 +274,7 @@ Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `ex
 
 If a client config exists, selecting the client also auto-fills known brand/list/sender defaults before processing.
 
-For deployment, I prepared the project for AWS Elastic Beanstalk with a production WSGI entrypoint, `gunicorn`, a `Procfile`, deployment packaging script, `.ebignore`, and a `/healthz` endpoint for load balancer checks. I uploaded an Elastic Beanstalk application version to AWS account `930382914692` in `ap-southeast-1`; creating the running environment is intentionally a separate step because it provisions billable AWS resources.
+For deployment, I prepared and launched the project on AWS Elastic Beanstalk with a production WSGI entrypoint, `gunicorn`, a `Procfile`, deployment packaging script, `.ebignore`, and a `/healthz` endpoint for health checks. The running AWS environment is `helium-edm-ops-prod` in `ap-southeast-1`.
 
 Example output summary:
 
@@ -416,8 +416,10 @@ AWS deployment artifact:
 ```text
 Elastic Beanstalk application: helium-edm-ops
 Region: ap-southeast-1
-Uploaded version: 8246c02-20260506143607
-Environment: pending explicit approval to create billable AWS resources
+Environment: helium-edm-ops-prod
+Uploaded/deployed version: 97f8733-20260506144713
+Live URL: http://helium-edm-ops-prod.eba-tfa3sapy.ap-southeast-1.elasticbeanstalk.com
+Health check: http://helium-edm-ops-prod.eba-tfa3sapy.ap-southeast-1.elasticbeanstalk.com/healthz
 ```
 
 Main files:

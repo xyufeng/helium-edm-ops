@@ -54,6 +54,16 @@ EB_ENV_NAME=helium-edm-ops-prod \
 
 The script packages the app, uploads it to S3, creates an Elastic Beanstalk application version, and updates the target environment if it already exists.
 
+Current deployed environment:
+
+```text
+Application: helium-edm-ops
+Environment: helium-edm-ops-prod
+Region: ap-southeast-1
+URL: http://helium-edm-ops-prod.eba-tfa3sapy.ap-southeast-1.elasticbeanstalk.com
+Version: 97f8733-20260506144713
+```
+
 ## Storage Note
 
 Run artifacts are stored on the instance filesystem under `runs/`. For long-term production retention, add S3 artifact storage later.
