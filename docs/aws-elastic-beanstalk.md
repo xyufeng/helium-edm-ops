@@ -13,7 +13,7 @@ FLASK_SECRET_KEY=...
 SENDY_BASE_URL=https://helium.sg
 SENDY_API_KEY=...
 EMAILLISTVERIFY_API_KEY=...
-DASHBOARD_COOKIE_SECURE=false
+DASHBOARD_COOKIE_SECURE=true
 MAX_UPLOAD_MB=25
 ```
 
@@ -33,7 +33,7 @@ SENDY_DEFAULT_FROM_EMAIL=hello@helium.sg
 SENDY_DEFAULT_REPLY_TO=hello@helium.sg
 ```
 
-Set `DASHBOARD_COOKIE_SECURE=true` after HTTPS is configured.
+`DASHBOARD_COOKIE_SECURE=true` is enabled because the app is served through CloudFront HTTPS.
 
 ## Deploy
 
@@ -62,6 +62,15 @@ Environment: helium-edm-ops-prod
 Region: ap-southeast-1
 URL: http://helium-edm-ops-prod.eba-tfa3sapy.ap-southeast-1.elasticbeanstalk.com
 Version: 97f8733-20260506144713
+```
+
+Current HTTPS front door:
+
+```text
+Domain: https://demo.helium.sg
+CloudFront distribution: E3I851YFE9Y1Y7
+ACM certificate: arn:aws:acm:us-east-1:930382914692:certificate/9ca37e94-8617-4fcb-9c67-00f884cbe81c
+Route 53 zone: helium.sg
 ```
 
 ## Storage Note

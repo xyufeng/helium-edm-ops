@@ -274,7 +274,7 @@ Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `ex
 
 If a client config exists, selecting the client also auto-fills known brand/list/sender defaults before processing.
 
-For deployment, I prepared and launched the project on AWS Elastic Beanstalk with a production WSGI entrypoint, `gunicorn`, a `Procfile`, deployment packaging script, `.ebignore`, and a `/healthz` endpoint for health checks. The running AWS environment is `helium-edm-ops-prod` in `ap-southeast-1`.
+For deployment, I prepared and launched the project on AWS Elastic Beanstalk with a production WSGI entrypoint, `gunicorn`, a `Procfile`, deployment packaging script, `.ebignore`, and a `/healthz` endpoint for health checks. The running AWS environment is `helium-edm-ops-prod` in `ap-southeast-1`, fronted by CloudFront with ACM SSL at `https://demo.helium.sg`.
 
 Example output summary:
 
@@ -418,8 +418,9 @@ Elastic Beanstalk application: helium-edm-ops
 Region: ap-southeast-1
 Environment: helium-edm-ops-prod
 Uploaded/deployed version: 97f8733-20260506144713
-Live URL: http://helium-edm-ops-prod.eba-tfa3sapy.ap-southeast-1.elasticbeanstalk.com
-Health check: http://helium-edm-ops-prod.eba-tfa3sapy.ap-southeast-1.elasticbeanstalk.com/healthz
+HTTPS URL: https://demo.helium.sg
+Health check: https://demo.helium.sg/healthz
+CloudFront distribution: E3I851YFE9Y1Y7
 ```
 
 Main files:

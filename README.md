@@ -81,7 +81,8 @@ AWS deployment:
 
 - The repo includes `Procfile`, `requirements.txt`, `helium_edm/wsgi.py`, `.ebignore`, and `scripts/deploy_aws_eb.sh` for Elastic Beanstalk.
 - Configure AWS credentials with `aws login`, then see `docs/aws-elastic-beanstalk.md`.
-- Current AWS environment: `helium-edm-ops-prod` at `http://helium-edm-ops-prod.eba-tfa3sapy.ap-southeast-1.elasticbeanstalk.com`.
+- Current HTTPS URL: `https://demo.helium.sg`.
+- Current AWS environment: `helium-edm-ops-prod` behind CloudFront distribution `E3I851YFE9Y1Y7`.
 
 ## Agent-style demo without API keys
 
