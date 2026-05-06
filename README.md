@@ -77,6 +77,11 @@ Production dashboard settings:
 - Set `MAX_UPLOAD_MB` to control upload limits. The default is `25`.
 - Set `DASHBOARD_COOKIE_SECURE=true` when serving over HTTPS.
 
+AWS deployment:
+
+- The repo includes `Procfile`, `requirements.txt`, `helium_edm/wsgi.py`, `.ebignore`, and `scripts/deploy_aws_eb.sh` for Elastic Beanstalk.
+- Configure AWS credentials with `aws login`, then see `docs/aws-elastic-beanstalk.md`.
+
 ## Agent-style demo without API keys
 
 Drop mixed files into an intake folder, then let the agent classify and process them:

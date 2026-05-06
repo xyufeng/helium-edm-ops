@@ -42,11 +42,15 @@ def create_app() -> Flask:
 
     @app.before_request
     def require_login() -> Response | None:
-        if request.endpoint in {"login", "login_post"}:
+        if request.endpoint in {"login", "login_post", "healthz"}:
             return None
         if session.get("authenticated"):
             return None
         return redirect(url_for("login"))
+
+    @app.get("/healthz")
+    def healthz() -> Response:
+        return jsonify({"ok": True})
 
     @app.get("/login")
     def login() -> str:
