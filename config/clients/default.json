@@ -1,10 +1,13 @@
 {
+  "display_name": "Default sample",
   "sendy_brand_id": "",
+  "sendy_brand_name": "",
   "sendy_list_id": "",
   "from_name": "Helium",
   "from_email": "hello@helium.sg",
   "reply_to": "hello@helium.sg",
   "header_path": "templates/clients/default/header.html",
   "footer_path": "templates/clients/default/footer.html",
-  "required_footer_text": "unsubscribe"
+  "required_footer_text": "unsubscribe",
+  "dashboard_visible": false
 }

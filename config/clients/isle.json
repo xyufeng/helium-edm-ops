@@ -1,0 +1,13 @@
+{
+  "display_name": "ISLE",
+  "sendy_brand_id": "1",
+  "sendy_brand_name": "ISLE",
+  "sendy_list_id": "",
+  "from_name": "ISLE",
+  "from_email": "hello@helium.sg",
+  "reply_to": "hello@helium.sg",
+  "header_path": "templates/clients/isle/header.html",
+  "footer_path": "templates/clients/isle/footer.html",
+  "required_footer_text": "unsubscribe",
+  "dashboard_visible": true
+}

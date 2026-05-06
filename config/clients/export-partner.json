@@ -1,10 +1,13 @@
 {
+  "display_name": "Export Partner sample",
   "sendy_brand_id": "demo_brand_id",
+  "sendy_brand_name": "Demo brand",
   "sendy_list_id": "demo_list_id",
   "from_name": "Export Partner Network",
   "from_email": "hello@helium.sg",
   "reply_to": "hello@helium.sg",
   "header_path": "templates/clients/export-partner/header.html",
   "footer_path": "templates/clients/export-partner/footer.html",
-  "required_footer_text": "unsubscribe"
+  "required_footer_text": "unsubscribe",
+  "dashboard_visible": false
 }

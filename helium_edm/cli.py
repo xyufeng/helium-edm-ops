@@ -20,6 +20,13 @@ TAG_RE = re.compile(r"<[^>]+>")
 WS_RE = re.compile(r"\s+")
 HREF_RE = re.compile(r"(?is)<a\b[^>]*\bhref=[\"']([^\"']+)[\"'][^>]*>")
 IMG_RE = re.compile(r"(?is)<img\b([^>]*)>")
+PLACEHOLDER_VALUES = {
+    "replace_me",
+    "change_me",
+    "replace_with_random_secret",
+    "your_sendy_api_key",
+    "your_emaillistverify_api_key",
+}
 
 
 @dataclass(frozen=True)
@@ -67,7 +74,9 @@ class IntakePlan:
 @dataclass(frozen=True)
 class ClientConfig:
     slug: str
+    display_name: str = ""
     sendy_brand_id: str = ""
+    sendy_brand_name: str = ""
     sendy_list_id: str = ""
     from_name: str = ""
     from_email: str = ""
@@ -75,10 +84,12 @@ class ClientConfig:
     header_path: str = ""
     footer_path: str = ""
     required_footer_text: str = ""
+    dashboard_visible: bool = True
 
 
 def env(name: str, default: str = "") -> str:
-    return os.environ.get(name, default).strip()
+    value = os.environ.get(name, default).strip()
+    return "" if value.lower() in PLACEHOLDER_VALUES else value
 
 
 def load_dotenv(path: Path = Path(".env")) -> None:
@@ -273,7 +284,9 @@ def load_client_config(client: str) -> ClientConfig:
     data = json.loads(path.read_text(encoding="utf-8"))
     return ClientConfig(
         slug=client_slug,
+        display_name=str(data.get("display_name", client_slug)).strip(),
         sendy_brand_id=str(data.get("sendy_brand_id", "")).strip(),
+        sendy_brand_name=str(data.get("sendy_brand_name", "")).strip(),
         sendy_list_id=str(data.get("sendy_list_id", "")).strip(),
         from_name=str(data.get("from_name", "")).strip(),
         from_email=str(data.get("from_email", "")).strip(),
@@ -281,6 +294,7 @@ def load_client_config(client: str) -> ClientConfig:
         header_path=str(data.get("header_path", "")).strip(),
         footer_path=str(data.get("footer_path", "")).strip(),
         required_footer_text=str(data.get("required_footer_text", "")).strip(),
+        dashboard_visible=bool(data.get("dashboard_visible", True)),
     )
 
 

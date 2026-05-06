@@ -51,11 +51,11 @@ http://127.0.0.1:5001
 The dashboard lets the operator:
 
 - Sign in with `DASHBOARD_PASSWORD`
-- Choose a Helium client
-- Auto-fill Sendy list, brand, sender, and reply-to fields from client config
+- Choose a real Helium Sendy client/brand
+- Auto-fill Sendy brand, sender, and reply-to fields from client config
 - Upload the EDM HTML and contact list CSV
 - See EmailListVerify and Sendy configuration status
-- Fetch Sendy brands and lists when the Sendy API key is configured
+- Fetch Sendy brands and lists automatically when the Sendy API key is configured
 - Auto-fill Sendy brand ID and list ID from discovery
 - Record consent attestation for the uploaded list
 - Run the verification/list hygiene workflow
@@ -69,6 +69,12 @@ The dashboard lets the operator:
 Dry run is checked by default so the operator can inspect the plan and artifacts before touching live APIs.
 
 Live Sendy import or campaign creation requires the operator to confirm that the uploaded list has provided consent. The tool records that attestation in the run report; it does not try to infer consent from EmailListVerify.
+
+Production dashboard settings:
+
+- Set `HELIUM_ENV=production` to require an explicit `DASHBOARD_PASSWORD` and `FLASK_SECRET_KEY`.
+- Set `MAX_UPLOAD_MB` to control upload limits. The default is `25`.
+- Set `DASHBOARD_COOKIE_SECURE=true` when serving over HTTPS.
 
 ## Agent-style demo without API keys
 
@@ -217,7 +223,9 @@ config/clients/<client-slug>.json
 
 Supported fields:
 
+- `display_name`
 - `sendy_brand_id`
+- `sendy_brand_name`
 - `sendy_list_id`
 - `from_name`
 - `from_email`
@@ -225,8 +233,11 @@ Supported fields:
 - `header_path`
 - `footer_path`
 - `required_footer_text`
+- `dashboard_visible`
 
 Do not store API keys in client config. Keep secrets in `.env`.
+
+The production dashboard hides sample configs and shows the live Helium Sendy brands configured in `config/clients`: ISLE, CIIE, Test, and China Security Association. Choosing a client preselects its Sendy brand and loads the live list options for that brand.
 
 ## Expert review
 

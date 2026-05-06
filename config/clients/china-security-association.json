@@ -1,0 +1,13 @@
+{
+  "display_name": "China Security Association",
+  "sendy_brand_id": "4",
+  "sendy_brand_name": "China Security Association",
+  "sendy_list_id": "",
+  "from_name": "China Security Association",
+  "from_email": "hello@helium.sg",
+  "reply_to": "hello@helium.sg",
+  "header_path": "templates/clients/china-security-association/header.html",
+  "footer_path": "templates/clients/china-security-association/footer.html",
+  "required_footer_text": "unsubscribe",
+  "dashboard_visible": true
+}

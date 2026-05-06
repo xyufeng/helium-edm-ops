@@ -1,0 +1,13 @@
+{
+  "display_name": "CIIE",
+  "sendy_brand_id": "2",
+  "sendy_brand_name": "CIIE",
+  "sendy_list_id": "",
+  "from_name": "CIIE",
+  "from_email": "hello@helium.sg",
+  "reply_to": "hello@helium.sg",
+  "header_path": "templates/clients/ciie/header.html",
+  "footer_path": "templates/clients/ciie/footer.html",
+  "required_footer_text": "unsubscribe",
+  "dashboard_visible": true
+}

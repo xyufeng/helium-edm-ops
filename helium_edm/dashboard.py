@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import shutil
@@ -33,6 +34,11 @@ def create_app() -> Flask:
     load_dotenv()
     app = Flask(__name__)
     app.secret_key = env("FLASK_SECRET_KEY", "dev-secret-change-me")
+    app.config["MAX_CONTENT_LENGTH"] = int(env("MAX_UPLOAD_MB", "25")) * 1024 * 1024
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = env("DASHBOARD_COOKIE_SECURE", "").lower() == "true" or env("HELIUM_ENV") == "production"
+    validate_dashboard_config()
 
     @app.before_request
     def require_login() -> Response | None:
@@ -50,7 +56,7 @@ def create_app() -> Flask:
     def login_post() -> Response:
         password = request.form.get("password", "")
         expected = env("DASHBOARD_PASSWORD", "admin")
-        if password == expected:
+        if hmac.compare_digest(password, expected):
             session["authenticated"] = True
             return redirect(url_for("dashboard"))
         flash("Incorrect password.")
@@ -163,7 +169,9 @@ def create_app() -> Flask:
             {
                 "ok": True,
                 "config": {
+                    "display_name": config.display_name,
                     "sendy_brand_id": config.sendy_brand_id,
+                    "sendy_brand_name": config.sendy_brand_name,
                     "sendy_list_id": config.sendy_list_id,
                     "from_name": config.from_name,
                     "from_email": config.from_email,
@@ -175,12 +183,40 @@ def create_app() -> Flask:
     return app
 
 
-def list_clients() -> list[str]:
+def validate_dashboard_config() -> None:
+    if env("HELIUM_ENV") != "production":
+        return
+    if not env("DASHBOARD_PASSWORD"):
+        raise ValueError("DASHBOARD_PASSWORD is required when HELIUM_ENV=production.")
+    if not env("FLASK_SECRET_KEY"):
+        raise ValueError("FLASK_SECRET_KEY is required when HELIUM_ENV=production.")
+
+
+def list_clients() -> list[dict[str, str]]:
+    config_dir = Path("config/clients")
+    clients: list[dict[str, str]] = []
+    if config_dir.exists():
+        for path in sorted(config_dir.glob("*.json")):
+            config = load_client_config(path.stem)
+            if not config.dashboard_visible:
+                continue
+            clients.append(
+                {
+                    "slug": config.slug,
+                    "label": config.display_name or config.sendy_brand_name or config.slug,
+                    "brand_id": config.sendy_brand_id,
+                }
+            )
+    if clients:
+        return sorted(clients, key=lambda item: item["label"].lower())
+
     client_dir = Path("templates/clients")
     if not client_dir.exists():
-        return ["default"]
-    clients = sorted(path.name for path in client_dir.iterdir() if path.is_dir())
-    return clients or ["default"]
+        return [{"slug": "default", "label": "Default", "brand_id": ""}]
+    template_clients = sorted(path.name for path in client_dir.iterdir() if path.is_dir())
+    return [{"slug": client, "label": client, "brand_id": ""} for client in template_clients] or [
+        {"slug": "default", "label": "Default", "brand_id": ""}
+    ]
 
 
 def service_status() -> dict[str, dict[str, str]]:
@@ -354,7 +390,7 @@ DASHBOARD_TEMPLATE = """
             <label>Client
               <select id="client-select" name="client">
                 {% for client in clients %}
-                  <option value="{{ client }}">{{ client }}</option>
+                  <option value="{{ client.slug }}" data-brand-id="{{ client.brand_id }}">{{ client.label }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -477,6 +513,7 @@ DASHBOARD_TEMPLATE = """
         if (Array.isArray(value)) return value;
         if (value && Array.isArray(value.brands)) return value.brands;
         if (value && Array.isArray(value.lists)) return value.lists;
+        if (value && typeof value === 'object') return Object.values(value);
         return [];
       }
 
@@ -511,19 +548,23 @@ DASHBOARD_TEMPLATE = """
         return payload;
       }
 
-      document.getElementById('load-brands').addEventListener('click', async () => {
+      let brandsLoaded = false;
+
+      async function loadBrands(preselectBrandId = '') {
         statusEl.textContent = 'Loading Sendy brands...';
         try {
           const payload = await fetchJson('{{ url_for("sendy_brands") }}');
           fillSelect(brandSelect, normalizeRows(payload.brands), 'Choose a brand');
-          statusEl.textContent = 'Brands loaded.';
+          brandsLoaded = true;
+          if (preselectBrandId) brandSelect.value = preselectBrandId;
+          statusEl.textContent = preselectBrandId ? 'Client brand loaded.' : 'Brands loaded.';
         } catch (error) {
           statusEl.textContent = error.message;
         }
-      });
+      }
 
-      document.getElementById('load-lists').addEventListener('click', async () => {
-        const brandId = brandSelect.value || brandInput.value;
+      async function loadLists(brandId = '', preselectListId = '') {
+        brandId = brandId || brandSelect.value || brandInput.value;
         if (!brandId) {
           statusEl.textContent = 'Choose or enter a Sendy brand ID first.';
           return;
@@ -533,15 +574,21 @@ DASHBOARD_TEMPLATE = """
         try {
           const payload = await fetchJson(`{{ url_for("sendy_lists") }}?brand_id=${encodeURIComponent(brandId)}`);
           fillSelect(listSelect, normalizeRows(payload.lists), 'Choose a list');
-          statusEl.textContent = 'Lists loaded.';
+          if (preselectListId) listSelect.value = preselectListId;
+          statusEl.textContent = preselectListId ? 'Client list loaded.' : 'Lists loaded.';
         } catch (error) {
           statusEl.textContent = error.message;
         }
-      });
+      }
 
-      brandSelect.addEventListener('change', () => {
+      document.getElementById('load-brands').addEventListener('click', () => loadBrands());
+      document.getElementById('load-lists').addEventListener('click', () => loadLists());
+
+      brandSelect.addEventListener('change', async () => {
         brandInput.value = brandSelect.value;
         listSelect.innerHTML = '<option value="">Load lists for this brand</option>';
+        listInput.value = '';
+        if (brandSelect.value) await loadLists(brandSelect.value);
       });
 
       listSelect.addEventListener('change', () => {
@@ -557,7 +604,12 @@ DASHBOARD_TEMPLATE = """
           fromNameInput.value = config.from_name || '';
           fromEmailInput.value = config.from_email || '';
           replyToInput.value = config.reply_to || '';
-          statusEl.textContent = config.sendy_brand_id || config.sendy_list_id ? 'Client defaults loaded.' : 'No client Sendy defaults configured.';
+          if (!brandsLoaded) await loadBrands(config.sendy_brand_id || '');
+          if (config.sendy_brand_id) {
+            brandSelect.value = config.sendy_brand_id;
+            await loadLists(config.sendy_brand_id, config.sendy_list_id || '');
+          }
+          statusEl.textContent = config.sendy_brand_id ? 'Client Sendy destination loaded.' : 'No client Sendy brand configured.';
         } catch (error) {
           statusEl.textContent = error.message;
         }
