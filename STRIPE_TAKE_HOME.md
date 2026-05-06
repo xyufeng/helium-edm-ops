@@ -334,7 +334,7 @@ The full review is recorded in `EXPERT_REVIEW.md`. The most important recommenda
 4. Show the client-specific header/footer to make the multi-client workflow obvious.
 5. Show `run_report.json`, `rendered_edm.html`, and `verified_contacts.csv` as the audit trail.
 
-I implemented the highest-impact UI recommendation as part of the dashboard work: every dashboard run now writes a human-readable `runs/latest/index.html` report that summarizes the run for screen recording.
+I implemented the highest-impact UI recommendation as part of the dashboard work: every dashboard run now writes a human-readable `runs/latest/index.html` report that summarizes the run for screen recording. The report shows campaign readiness, artifact links, verification counts, consent attestation, campaign metadata, processing plan, file assessment, warnings, deliverability checks, and Sendy campaign result.
 
 ## Roadmap
 

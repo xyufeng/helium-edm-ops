@@ -257,6 +257,19 @@ pytest
 
 The dashboard smoke test covers password login, sample file upload, dry-run processing, suppression handling, and generated artifacts.
 
+The generated human-readable report at `runs/latest/index.html` includes:
+
+- Campaign readiness status
+- Links to rendered EDM, verified CSV, and JSON report
+- Accepted/rejected/quarantined/suppressed/imported counts
+- Consent attestation
+- Campaign metadata
+- Processing plan
+- File assessment
+- Input warnings
+- Deliverability checks
+- Sendy campaign result
+
 ## Sources
 
 - Sendy API: https://sendy.co/api

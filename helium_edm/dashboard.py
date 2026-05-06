@@ -271,6 +271,8 @@ def render_dashboard_report(summary: dict[str, Any], report: dict[str, Any]) -> 
     assessments = report.get("file_assessments") or []
     warnings = report.get("warnings") or []
     delivery_checks = (report.get("ai_preflight") or {}).get("deterministic_checks") or []
+    blocking_checks = [item for item in delivery_checks if item.get("severity") == "error"]
+    ready_for_review = bool(summary.get("campaign_result") and summary.get("campaign_result") != "skipped" and not blocking_checks)
     return render_template_string(
         REPORT_TEMPLATE,
         title=APP_TITLE,
@@ -280,6 +282,8 @@ def render_dashboard_report(summary: dict[str, Any], report: dict[str, Any]) -> 
         assessments=assessments,
         warnings=warnings,
         delivery_checks=delivery_checks,
+        ready_for_review=ready_for_review,
+        blocking_checks=blocking_checks,
         report=report,
     )
 
@@ -584,6 +588,24 @@ REPORT_TEMPLATE = """
       </div>
     </header>
     <main>
+      <section class="panel hero-report">
+        <div>
+          <div class="eyebrow">Campaign readiness</div>
+          <h2>{{ "Ready for review" if ready_for_review else "Needs review" }}</h2>
+          <p>
+            {% if ready_for_review %}
+              The campaign artifacts are generated and the Sendy draft/import payload is ready for operator review.
+            {% else %}
+              Review warnings, blocking checks, or skipped Sendy actions before sending.
+            {% endif %}
+          </p>
+        </div>
+        <div class="links">
+          <a href="rendered_edm.html" target="_blank">Rendered EDM</a>
+          <a href="verified_contacts.csv" target="_blank">Verified CSV</a>
+          <a href="run_report.json" target="_blank">JSON report</a>
+        </div>
+      </section>
       <section class="status-grid">
         <article class="panel"><div class="eyebrow">Client</div><h2>{{ summary.client }}</h2></article>
         <article class="panel"><div class="eyebrow">Accepted</div><h2>{{ summary.accepted }}</h2></article>
@@ -596,6 +618,19 @@ REPORT_TEMPLATE = """
         <h2>Consent Attestation</h2>
         <p>Confirmed: {{ "yes" if summary.consent_confirmed else "no" }}</p>
         <p>Basis: {{ summary.consent_basis or "not recorded" }}</p>
+      </section>
+      <section class="panel">
+        <h2>Campaign Metadata</h2>
+        <table>
+          <tbody>
+            <tr><th>Subject</th><td>{{ summary.subject }}</td></tr>
+            <tr><th>Sendy brand ID</th><td>{{ summary.sendy_brand_id }}</td></tr>
+            <tr><th>Sendy list ID</th><td>{{ summary.sendy_list_id }}</td></tr>
+            <tr><th>From</th><td>{{ summary.from_name }} &lt;{{ summary.from_email }}&gt;</td></tr>
+            <tr><th>Reply-to</th><td>{{ summary.reply_to }}</td></tr>
+            <tr><th>Suppression file</th><td>{{ summary.suppression_file or "none" }}</td></tr>
+          </tbody>
+        </table>
       </section>
       <section class="panel">
         <h2>Processing Plan</h2>
@@ -618,6 +653,9 @@ REPORT_TEMPLATE = """
       </section>
       <section class="panel">
         <h2>Deliverability Checks</h2>
+        {% if blocking_checks %}
+          <div class="alert">Blocking checks found. Live campaign creation should not proceed until these are fixed.</div>
+        {% endif %}
         <table>
           <thead><tr><th>Severity</th><th>Code</th><th>Message</th></tr></thead>
           <tbody>
@@ -650,6 +688,7 @@ main { width: min(1120px, calc(100% - 32px)); margin: 24px auto 48px; }
 .login-shell { min-height: 100vh; display: grid; place-items: center; }
 .login-panel { width: min(420px, calc(100vw - 32px)); }
 .panel { background: #ffffff; border: 1px solid #dde3ea; border-radius: 8px; padding: 20px; margin-bottom: 18px; box-shadow: 0 1px 2px rgba(16,24,40,0.04); }
+.hero-report { display: flex; justify-content: space-between; gap: 20px; align-items: center; border-color: #b7d8c9; background: #f0fdf4; }
 .status-grid, .summary-grid, .grid-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
