@@ -563,8 +563,11 @@ def parse_sendy_json(value: str) -> Any:
         raise ValueError(value)
     try:
         return json.loads(value)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Unexpected Sendy response: {value}") from exc
+    except json.JSONDecodeError:
+        try:
+            return json.loads(value, strict=False)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Unexpected Sendy response: {value}") from exc
 
 
 def ai_preflight(html_text: str, plain_text: str, subject: str, client_note: str) -> dict[str, Any]:

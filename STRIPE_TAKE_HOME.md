@@ -153,6 +153,7 @@ The build evolved in a few small steps:
 4. I then changed the wrapper logic from one global Helium header/footer to per-client templates, because each Helium client needs their own branded header and footer.
 5. I added a password-protected dashboard so the operator can choose a client, upload files, see verification/Sendy service status, run the workflow, and review outputs without using CLI flags directly.
 6. I added per-client Sendy config so choosing a client can auto-fill brand/list/sender defaults while keeping API keys in `.env`.
+7. I connected the dashboard to live Sendy brand/list discovery so the operator can select the right destination instead of copying IDs by hand.
 
 The current template convention is:
 
@@ -206,6 +207,12 @@ The better structure was:
 5. The final run report combines deterministic results, agent planning, Sendy actions, and AI feedback.
 
 This was the important design shift: AI is not responsible for deciding who gets emailed or silently mutating the list. It is responsible for preflight judgment and copy suggestions.
+
+### Debugging Moment
+
+One real integration issue appeared during live Sendy testing. Brand discovery worked, but one brand's list endpoint returned JSON-like data containing raw tab/control characters inside a list name. Python's strict JSON parser rejected that response, even though the data was otherwise usable.
+
+I adjusted the shared Sendy response parser to try strict JSON first, then retry with Python's tolerant JSON mode for Sendy's malformed-but-readable responses. I added a regression test for that exact case and re-ran live discovery against all Helium Sendy brands. The dashboard can now load all four brands and their lists.
 
 ## Prompt Used
 
@@ -344,7 +351,7 @@ I am using GitHub Issues as the active roadmap and debugging tracker:
 https://github.com/xyufeng/helium-edm-ops/issues
 ```
 
-The first issue set covers dashboard polish, consent basis, per-client Sendy config, suppression lists, EmailListVerify status policy, deterministic deliverability checks, live Sendy discovery debugging, and automated dashboard smoke tests.
+The first issue set covers dashboard polish, consent basis, per-client Sendy config, suppression lists, EmailListVerify status policy, deterministic deliverability checks, live Sendy discovery debugging, and automated dashboard smoke tests. That first roadmap pass is complete.
 
 ## Real Usage
 

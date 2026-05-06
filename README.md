@@ -247,6 +247,8 @@ https://github.com/xyufeng/helium-edm-ops/issues
 
 Use Issues to track new features, safety improvements, Sendy/EmailListVerify integration work, dashboard polish, and bugs found during live testing.
 
+The first roadmap pass is complete. Live Sendy discovery now loads the Helium account's brands and lists from the dashboard; the parser handles Sendy list responses that contain raw control characters inside list names.
+
 ## Tests
 
 Run the smoke test suite:
@@ -256,6 +258,8 @@ pytest
 ```
 
 The dashboard smoke test covers password login, sample file upload, dry-run processing, suppression handling, and generated artifacts.
+
+The Sendy parser regression test covers malformed-but-readable JSON returned by Sendy's list endpoint.
 
 The generated human-readable report at `runs/latest/index.html` includes:
 
