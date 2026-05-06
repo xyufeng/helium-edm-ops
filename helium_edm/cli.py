@@ -515,6 +515,8 @@ def write_report(
     ai_result: dict[str, Any],
     sendy_results: list[dict[str, str]],
     campaign_result: str,
+    consent_basis: str = "",
+    consent_confirmed: bool = False,
     plan: IntakePlan | None = None,
     assessments: list[FileAssessment] | None = None,
     rendered_html_path: Path | None = None,
@@ -537,6 +539,10 @@ def write_report(
         },
         "file_assessments": [asdict(item) for item in assessments or []],
         "processing_plan": asdict(plan) if plan else None,
+        "consent": {
+            "confirmed": consent_confirmed,
+            "basis": consent_basis,
+        },
         "rendered_html_path": str(rendered_html_path) if rendered_html_path else None,
         "warnings": warnings,
         "ai_preflight": ai_result,
@@ -559,6 +565,8 @@ def process_campaign(
     output_dir: Path,
     title: str = "",
     client_note: str = "",
+    consent_basis: str = "",
+    consent_confirmed: bool = False,
     email_column: str = "email",
     name_column: str = "name",
     accepted_statuses: set[str] | None = None,
@@ -573,6 +581,10 @@ def process_campaign(
     assessments: list[FileAssessment] | None = None,
 ) -> dict[str, Any]:
     accepted_statuses = accepted_statuses or {"ok"}
+    consent_basis = consent_basis.strip() or ("provided_client_consent" if consent_confirmed else "")
+
+    if not dry_run and (import_to_sendy or create_campaign) and not consent_confirmed:
+        raise ValueError("Confirm that the uploaded list has provided consent before live Sendy actions.")
 
     edm_html = html_path.read_text(encoding="utf-8")
     header_html = header_path.read_text(encoding="utf-8") if header_path.exists() else ""
@@ -626,6 +638,8 @@ def process_campaign(
         ai_result,
         sendy_results,
         campaign_result,
+        consent_basis=consent_basis,
+        consent_confirmed=consent_confirmed,
         plan=plan,
         assessments=assessments,
         rendered_html_path=rendered_html_path,
@@ -642,6 +656,8 @@ def process_campaign(
         "warnings": len(warnings),
         "rendered_html": str(rendered_html_path),
         "campaign_result": campaign_result,
+        "consent_basis": consent_basis,
+        "consent_confirmed": consent_confirmed,
         "output_dir": str(output_dir),
         "sendy_imported": len(sendy_results),
     }
@@ -660,6 +676,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--subject", default="", help="Campaign subject line.")
     parser.add_argument("--title", default="", help="Internal Sendy campaign title.")
     parser.add_argument("--client-note", default="", help="Context for AI preflight.")
+    parser.add_argument("--consent-basis", default="", help="Audit note for why this list is permissioned.")
+    parser.add_argument("--confirm-consent", action="store_true", help="Confirm uploaded list has provided consent. Required for live Sendy actions.")
     parser.add_argument("--list-id", required=True, help="Sendy list ID to import/send to.")
     parser.add_argument("--brand-id", default="", help="Sendy brand ID for draft creation.")
     parser.add_argument("--email-column", default="email")
@@ -746,6 +764,8 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output_dir,
         title=args.title,
         client_note=args.client_note,
+        consent_basis=args.consent_basis,
+        consent_confirmed=args.confirm_consent,
         email_column=args.email_column,
         name_column=args.name_column,
         accepted_statuses=set(args.accepted_status),

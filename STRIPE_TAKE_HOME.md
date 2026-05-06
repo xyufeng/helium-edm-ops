@@ -79,15 +79,16 @@ The tool:
 10. Verifies emails through EmailListVerify.
 11. Converts the final EDM HTML into a plain-text fallback.
 12. Runs an AI preflight review on the EDM content.
-13. Imports accepted contacts into Sendy when enabled.
-14. Creates a Sendy draft, scheduled campaign, or send-now campaign.
-15. Writes an auditable run report.
+13. Records an operator consent attestation for the uploaded list.
+14. Imports accepted contacts into Sendy when enabled.
+15. Creates a Sendy draft, scheduled campaign, or send-now campaign.
+16. Writes an auditable run report.
 
 The tool is designed to run in `--dry-run` mode for demonstration without real API keys, and in live mode when Sendy, EmailListVerify, and optional OpenAI credentials are provided. In the normal workflow, it creates a Sendy campaign draft on the Helium Sendy instance so the campaign is ready for final review before sending.
 
 I also added a client template layer. Each Helium client can have their own saved header and footer in `templates/clients/<client-slug>/`, so the agent can package the campaign in the correct brand wrapper without rebuilding it each time.
 
-Important safety boundary: this is an opted-in EDM operations and list hygiene tool. EmailListVerify is used to check address quality, not consent. The default outcome is a Sendy draft for human review, not an automatic blast.
+Important safety boundary: this is an opted-in EDM operations and list hygiene tool. EmailListVerify is used to check address quality, not consent. Helium's operating assumption is that uploaded client lists have already provided consent, and the tool records an operator attestation for audit. The default outcome is a Sendy draft for human review, not an automatic blast.
 
 ## Tools Chosen
 
@@ -256,7 +257,7 @@ The dashboard demo is:
 helium-edm-dashboard
 ```
 
-Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `export-partner`, upload the sample CSV and HTML, leave dry run enabled, and process the campaign. When Sendy is configured, the dashboard can load Sendy brands and lists, then auto-fill the selected brand ID and list ID. The dashboard also shows whether EmailListVerify and Sendy are configured, then links to the generated run report, rendered EDM, verified CSV, and JSON audit trail.
+Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `export-partner`, upload the sample CSV and HTML, record the consent attestation, leave dry run enabled, and process the campaign. When Sendy is configured, the dashboard can load Sendy brands and lists, then auto-fill the selected brand ID and list ID. The dashboard also shows whether EmailListVerify and Sendy are configured, then links to the generated run report, rendered EDM, verified CSV, and JSON audit trail.
 
 Example output summary:
 
@@ -305,6 +306,7 @@ This file records:
 - AI preflight result
 - Sendy import results
 - Campaign creation result
+- Consent attestation and basis
 
 ### `runs/latest/rendered_edm.html`
 
@@ -342,6 +344,8 @@ After setting environment variables in `.env`, the real command for creating a S
 helium-edm \
   --input-dir client_uploads \
   --client CLIENT_SLUG \
+  --confirm-consent \
+  --consent-basis provided_client_consent \
   --list-id YOUR_SENDY_LIST_ID \
   --brand-id YOUR_SENDY_BRAND_ID \
   --import-to-sendy \
@@ -354,6 +358,8 @@ For a scheduled send:
 helium-edm \
   --input-dir client_uploads \
   --client CLIENT_SLUG \
+  --confirm-consent \
+  --consent-basis provided_client_consent \
   --list-id YOUR_SENDY_LIST_ID \
   --import-to-sendy \
   --create-campaign \

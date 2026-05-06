@@ -97,6 +97,8 @@ def create_app() -> Flask:
             list_id = request.form.get("list_id", "").strip()
             brand_id = request.form.get("brand_id", "").strip()
             client_note = request.form.get("client_note", "").strip()
+            consent_basis = request.form.get("consent_basis", "").strip()
+            consent_confirmed = request.form.get("consent_confirmed") == "on"
             dry_run = request.form.get("dry_run") == "on"
             import_to_sendy = request.form.get("import_to_sendy") == "on"
             create_campaign = request.form.get("create_campaign") == "on"
@@ -129,6 +131,8 @@ def create_app() -> Flask:
                 brand_id=brand_id,
                 output_dir=output_dir,
                 client_note=client_note,
+                consent_basis=consent_basis,
+                consent_confirmed=consent_confirmed,
                 dry_run=dry_run,
                 import_to_sendy=import_to_sendy,
                 create_campaign=create_campaign,
@@ -373,6 +377,22 @@ DASHBOARD_TEMPLATE = """
           <label>Operator note
             <textarea name="client_note" rows="3" placeholder="Context for AI preflight"></textarea>
           </label>
+          <div class="notice">
+            <strong>Consent attestation</strong>
+            <p>Helium's operating rule is that uploaded lists have already provided consent. Confirm this for the run so the audit report records it.</p>
+            <label>Consent basis
+              <select name="consent_basis">
+                <option value="provided_client_consent">Client-provided permissioned list</option>
+                <option value="newsletter_opt_in">Newsletter opt-in</option>
+                <option value="event_registration">Event registration</option>
+                <option value="customer_list">Customer list</option>
+                <option value="internal_test_list">Internal test list</option>
+              </select>
+            </label>
+            <div class="checks">
+              <label><input name="consent_confirmed" type="checkbox"> I confirm this uploaded list has provided consent</label>
+            </div>
+          </div>
           <div class="checks">
             <label><input name="dry_run" type="checkbox" checked> Dry run</label>
             <label><input name="import_to_sendy" type="checkbox" checked> Upload accepted contacts to Sendy</label>
@@ -509,6 +529,11 @@ REPORT_TEMPLATE = """
         <article class="panel"><div class="eyebrow">Accepted</div><h2>{{ summary.accepted }}</h2></article>
         <article class="panel"><div class="eyebrow">Rejected</div><h2>{{ summary.rejected }}</h2></article>
         <article class="panel"><div class="eyebrow">Imported</div><h2>{{ summary.sendy_imported }}</h2></article>
+      </section>
+      <section class="panel">
+        <h2>Consent Attestation</h2>
+        <p>Confirmed: {{ "yes" if summary.consent_confirmed else "no" }}</p>
+        <p>Basis: {{ summary.consent_basis or "not recorded" }}</p>
       </section>
       <section class="panel">
         <h2>Processing Plan</h2>

@@ -56,12 +56,15 @@ The dashboard lets the operator:
 - See EmailListVerify and Sendy configuration status
 - Fetch Sendy brands and lists when the Sendy API key is configured
 - Auto-fill Sendy brand ID and list ID from discovery
+- Record consent attestation for the uploaded list
 - Run the verification/list hygiene workflow
 - Upload accepted contacts into Sendy
 - Create a Sendy draft campaign
 - Open the generated report, rendered EDM, verified CSV, and JSON audit trail
 
 Dry run is checked by default so the operator can inspect the plan and artifacts before touching live APIs.
+
+Live Sendy import or campaign creation requires the operator to confirm that the uploaded list has provided consent. The tool records that attestation in the run report; it does not try to infer consent from EmailListVerify.
 
 ## Agent-style demo without API keys
 
@@ -116,6 +119,8 @@ Outputs:
 helium-edm \
   --input-dir client_uploads \
   --client CLIENT_SLUG \
+  --confirm-consent \
+  --consent-basis provided_client_consent \
   --list-id YOUR_SENDY_LIST_ID \
   --brand-id YOUR_SENDY_BRAND_ID \
   --import-to-sendy \
@@ -128,6 +133,8 @@ helium-edm \
 helium-edm \
   --input-dir client_uploads \
   --client CLIENT_SLUG \
+  --confirm-consent \
+  --consent-basis provided_client_consent \
   --list-id YOUR_SENDY_LIST_ID \
   --import-to-sendy \
   --create-campaign \
