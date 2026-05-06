@@ -423,7 +423,7 @@ AWS deployment artifact:
 Elastic Beanstalk application: helium-edm-ops
 Region: ap-southeast-1
 Environment: helium-edm-ops-prod
-Uploaded/deployed version: 583036b-20260506180811
+Uploaded/deployed version: 2c45ac5-20260506181817
 HTTPS URL: https://demo.helium.sg
 Health check: https://demo.helium.sg/healthz
 Presentation: https://demo.helium.sg/presentation
