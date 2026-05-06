@@ -579,6 +579,7 @@ REPORT_TEMPLATE = """
         <article class="panel"><div class="eyebrow">Client</div><h2>{{ summary.client }}</h2></article>
         <article class="panel"><div class="eyebrow">Accepted</div><h2>{{ summary.accepted }}</h2></article>
         <article class="panel"><div class="eyebrow">Rejected</div><h2>{{ summary.rejected }}</h2></article>
+        <article class="panel"><div class="eyebrow">Quarantined</div><h2>{{ summary.quarantined }}</h2></article>
         <article class="panel"><div class="eyebrow">Imported</div><h2>{{ summary.sendy_imported }}</h2></article>
       </section>
       <section class="panel">

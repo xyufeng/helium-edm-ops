@@ -59,6 +59,7 @@ The dashboard lets the operator:
 - Auto-fill Sendy brand ID and list ID from discovery
 - Record consent attestation for the uploaded list
 - Run the verification/list hygiene workflow
+- Separate accepted, rejected, and quarantined verification outcomes
 - Upload accepted contacts into Sendy
 - Create a Sendy draft campaign
 - Open the generated report, rendered EDM, verified CSV, and JSON audit trail
@@ -113,6 +114,14 @@ Outputs:
 - `runs/latest/verified_contacts.csv`
 - `runs/latest/run_report.json`
 - `runs/latest/rendered_edm.html`
+
+Verification policy:
+
+- Accepted statuses are imported into Sendy. Default: `ok`.
+- Quarantine statuses are held for human review and not imported. Defaults include `unknown`, `risky`, `catch_all`, and `accept_all` variants.
+- Everything else is rejected.
+
+Raw EmailListVerify status and the final disposition are both written to `verified_contacts.csv`.
 
 ## Real Sendy draft
 

@@ -32,6 +32,7 @@ class VerifiedContact:
     email: str
     name: str
     status: str
+    disposition: str
     accepted: bool
     reason: str
 
@@ -358,9 +359,14 @@ def verify_email(api_key: str, email_address: str, timeout: int = 30) -> str:
     return response.text.strip().lower()
 
 
+DEFAULT_ACCEPTED_STATUSES = {"ok"}
+DEFAULT_QUARANTINE_STATUSES = {"unknown", "risky", "catch_all", "catch-all", "accept_all", "accept-all"}
+
+
 def verify_contacts(
     contacts: list[Contact],
     accepted_statuses: set[str],
+    quarantine_statuses: set[str],
     dry_run: bool,
     pause_seconds: float,
 ) -> list[VerifiedContact]:
@@ -378,12 +384,19 @@ def verify_contacts(
                 time.sleep(pause_seconds)
 
         accepted = status in accepted_statuses
-        reason = "accepted" if accepted else f"rejected by EmailListVerify status '{status}'"
+        disposition = "accepted" if accepted else "quarantine" if status in quarantine_statuses else "rejected"
+        if disposition == "accepted":
+            reason = "accepted"
+        elif disposition == "quarantine":
+            reason = f"quarantined for human review by EmailListVerify status '{status}'"
+        else:
+            reason = f"rejected by EmailListVerify status '{status}'"
         verified.append(
             VerifiedContact(
                 email=contact.email,
                 name=contact.name,
                 status=status,
+                disposition=disposition,
                 accepted=accepted,
                 reason=reason,
             )
@@ -560,9 +573,11 @@ def write_report(
     output_dir.mkdir(parents=True, exist_ok=True)
     accepted = [item for item in verified if item.accepted]
     rejected = [item for item in verified if not item.accepted]
+    quarantined = [item for item in verified if item.disposition == "quarantine"]
+    rejected_only = [item for item in verified if item.disposition == "rejected"]
 
     with (output_dir / "verified_contacts.csv").open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["email", "name", "status", "accepted", "reason"])
+        writer = csv.DictWriter(f, fieldnames=["email", "name", "status", "disposition", "accepted", "reason"])
         writer.writeheader()
         for item in verified:
             writer.writerow(asdict(item))
@@ -570,7 +585,8 @@ def write_report(
     report = {
         "summary": {
             "accepted": len(accepted),
-            "rejected": len(rejected),
+            "rejected": len(rejected_only),
+            "quarantined": len(quarantined),
             "warnings": len(warnings),
         },
         "file_assessments": [asdict(item) for item in assessments or []],
@@ -609,6 +625,7 @@ def process_campaign(
     email_column: str = "email",
     name_column: str = "name",
     accepted_statuses: set[str] | None = None,
+    quarantine_statuses: set[str] | None = None,
     dry_run: bool = False,
     import_to_sendy: bool = False,
     create_campaign: bool = False,
@@ -619,7 +636,8 @@ def process_campaign(
     plan: IntakePlan | None = None,
     assessments: list[FileAssessment] | None = None,
 ) -> dict[str, Any]:
-    accepted_statuses = accepted_statuses or {"ok"}
+    accepted_statuses = accepted_statuses or DEFAULT_ACCEPTED_STATUSES
+    quarantine_statuses = quarantine_statuses or DEFAULT_QUARANTINE_STATUSES
     consent_basis = consent_basis.strip() or ("provided_client_consent" if consent_confirmed else "")
     client_config = load_client_config(client)
     list_id = list_id or client_config.sendy_list_id
@@ -645,8 +663,10 @@ def process_campaign(
 
     plain_text = html_to_plain_text(html_text)
     contacts, warnings = read_contacts(contacts_path, email_column, name_column)
-    verified = verify_contacts(contacts, accepted_statuses, dry_run, verification_pause)
+    verified = verify_contacts(contacts, accepted_statuses, quarantine_statuses, dry_run, verification_pause)
     accepted = [item for item in verified if item.accepted]
+    quarantined = [item for item in verified if item.disposition == "quarantine"]
+    rejected_only = [item for item in verified if item.disposition == "rejected"]
 
     ai_result = ai_preflight(html_text, plain_text, subject, client_note)
 
@@ -701,7 +721,8 @@ def process_campaign(
         "edm_file": str(html_path),
         "contacts_read": len(contacts),
         "accepted": len(accepted),
-        "rejected": len(verified) - len(accepted),
+        "rejected": len(rejected_only),
+        "quarantined": len(quarantined),
         "warnings": len(warnings),
         "rendered_html": str(rendered_html_path),
         "campaign_result": campaign_result,
@@ -739,7 +760,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reply-to", default="", help="Override reply-to email.")
     parser.add_argument("--email-column", default="email")
     parser.add_argument("--name-column", default="name")
-    parser.add_argument("--accepted-status", action="append", default=["ok"], help="Accepted EmailListVerify status. Repeatable.")
+    parser.add_argument("--accepted-status", action="append", default=sorted(DEFAULT_ACCEPTED_STATUSES), help="Accepted EmailListVerify status. Repeatable.")
+    parser.add_argument("--quarantine-status", action="append", default=sorted(DEFAULT_QUARANTINE_STATUSES), help="EmailListVerify status to quarantine for review. Repeatable.")
     parser.add_argument("--output-dir", type=Path, default=Path("runs/latest"))
     parser.add_argument("--dry-run", action="store_true", help="Do not call external APIs.")
     parser.add_argument("--import-to-sendy", action="store_true", help="Subscribe accepted contacts to Sendy.")
@@ -829,6 +851,7 @@ def main(argv: list[str] | None = None) -> int:
         email_column=args.email_column,
         name_column=args.name_column,
         accepted_statuses=set(args.accepted_status),
+        quarantine_statuses=set(args.quarantine_status),
         dry_run=args.dry_run,
         import_to_sendy=args.import_to_sendy,
         create_campaign=args.create_campaign,
