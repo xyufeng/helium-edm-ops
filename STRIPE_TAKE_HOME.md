@@ -324,6 +324,16 @@ The full review is recorded in `EXPERT_REVIEW.md`. The most important recommenda
 
 I implemented the highest-impact UI recommendation as part of the dashboard work: every dashboard run now writes a human-readable `runs/latest/index.html` report that summarizes the run for screen recording.
 
+## Roadmap
+
+I am using GitHub Issues as the active roadmap and debugging tracker:
+
+```text
+https://github.com/xyufeng/helium-edm-ops/issues
+```
+
+The first issue set covers dashboard polish, consent basis, per-client Sendy config, suppression lists, EmailListVerify status policy, deterministic deliverability checks, live Sendy discovery debugging, and automated dashboard smoke tests.
+
 ## Real Usage
 
 After setting environment variables in `.env`, the real command for creating a Sendy draft is:

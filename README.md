@@ -179,6 +179,16 @@ See `EXPERT_REVIEW.md` for the critical thinking, design thinking, email operati
 - Make the processing plan and audit artifacts visible in the demo.
 - Add consent basis, suppression-list handling, client config, and a human-readable run report as next improvements.
 
+## Roadmap and debugging
+
+GitHub Issues are the roadmap and debugging tracker for this project:
+
+```text
+https://github.com/xyufeng/helium-edm-ops/issues
+```
+
+Use Issues to track new features, safety improvements, Sendy/EmailListVerify integration work, dashboard polish, and bugs found during live testing.
+
 ## Sources
 
 - Sendy API: https://sendy.co/api
