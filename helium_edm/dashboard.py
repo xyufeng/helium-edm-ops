@@ -110,7 +110,8 @@ def create_app() -> Flask:
             client_note = request.form.get("client_note", "").strip()
             consent_basis = request.form.get("consent_basis", "").strip()
             consent_confirmed = request.form.get("consent_confirmed") == "on"
-            dry_run = request.form.get("dry_run") == "on"
+            run_mode = request.form.get("run_mode", "dry_run")
+            dry_run = run_mode != "live" and request.form.get("dry_run", "on") == "on"
             import_to_sendy = request.form.get("import_to_sendy") == "on"
             create_campaign = request.form.get("create_campaign") == "on"
 
@@ -458,8 +459,14 @@ DASHBOARD_TEMPLATE = """
               <label><input name="consent_confirmed" type="checkbox"> I confirm this uploaded list has provided consent</label>
             </div>
           </div>
+          <div class="notice">
+            <strong>Execution mode</strong>
+            <div class="checks">
+              <label><input name="run_mode" type="radio" value="dry_run" checked> Dry run</label>
+              <label><input name="run_mode" type="radio" value="live"> Live API mode</label>
+            </div>
+          </div>
           <div class="checks">
-            <label><input name="dry_run" type="checkbox" checked> Dry run</label>
             <label><input name="import_to_sendy" type="checkbox" checked> Upload accepted contacts to Sendy</label>
             <label><input name="create_campaign" type="checkbox" checked> Create Sendy draft campaign</label>
           </div>
@@ -471,6 +478,7 @@ DASHBOARD_TEMPLATE = """
         <section class="panel">
           <h2>Latest Run</h2>
           <div class="summary-grid">
+            <div><strong>{{ latest.summary.mode|upper }}</strong><span>Mode</span></div>
             <div><strong>{{ latest.summary.client }}</strong><span>Client</span></div>
             <div><strong>{{ latest.summary.accepted }}</strong><span>Accepted</span></div>
             <div><strong>{{ latest.summary.rejected }}</strong><span>Rejected</span></div>
@@ -671,6 +679,7 @@ REPORT_TEMPLATE = """
         </div>
       </section>
       <section class="status-grid">
+        <article class="panel"><div class="eyebrow">Mode</div><h2>{{ summary.mode|upper }}</h2></article>
         <article class="panel"><div class="eyebrow">Client</div><h2>{{ summary.client }}</h2></article>
         <article class="panel"><div class="eyebrow">Accepted</div><h2>{{ summary.accepted }}</h2></article>
         <article class="panel"><div class="eyebrow">Rejected</div><h2>{{ summary.rejected }}</h2></article>
@@ -688,6 +697,9 @@ REPORT_TEMPLATE = """
         <table>
           <tbody>
             <tr><th>Subject</th><td>{{ summary.subject }}</td></tr>
+            <tr><th>Email verification</th><td>{{ summary.email_verification }}</td></tr>
+            <tr><th>Sendy import</th><td>{{ summary.sendy_import_mode }}</td></tr>
+            <tr><th>Sendy campaign</th><td>{{ summary.sendy_campaign_mode }}</td></tr>
             <tr><th>Sendy brand</th><td>{{ summary.sendy_brand_id }}</td></tr>
             <tr><th>Sendy lists</th><td>{{ summary.sendy_list_id }}</td></tr>
             <tr><th>From</th><td>{{ summary.from_name }} &lt;{{ summary.from_email }}&gt;</td></tr>

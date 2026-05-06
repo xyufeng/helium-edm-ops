@@ -66,7 +66,7 @@ The dashboard lets the operator:
 - Create a Sendy draft campaign
 - Open the generated report, rendered EDM, verified CSV, and JSON audit trail
 
-Dry run is checked by default so the operator can inspect the plan and artifacts before touching live APIs.
+Dry run is the default execution mode so the operator can inspect the plan and artifacts before touching live APIs. Live API mode uses EmailListVerify for verification and Sendy for contact import/draft creation.
 
 Live Sendy import or campaign creation requires the operator to confirm that the uploaded list has provided consent. The tool records that attestation in the run report; it does not try to infer consent from EmailListVerify.
 
@@ -274,6 +274,7 @@ The Sendy parser regression test covers malformed-but-readable JSON returned by 
 
 The generated human-readable report at `runs/latest/index.html` includes:
 
+- Execution mode and external action modes
 - Campaign readiness status
 - Links to rendered EDM, verified CSV, and JSON report
 - Accepted/rejected/quarantined/suppressed/imported counts
