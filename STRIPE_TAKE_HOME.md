@@ -274,6 +274,8 @@ Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `ex
 
 If a client config exists, selecting the client also auto-fills known brand/list/sender defaults before processing.
 
+For deployment, I prepared the project for AWS Elastic Beanstalk with a production WSGI entrypoint, `gunicorn`, a `Procfile`, deployment packaging script, `.ebignore`, and a `/healthz` endpoint for load balancer checks. I uploaded an Elastic Beanstalk application version to AWS account `930382914692` in `ap-southeast-1`; creating the running environment is intentionally a separate step because it provisions billable AWS resources.
+
 Example output summary:
 
 ```json
@@ -297,7 +299,7 @@ The tool removes the duplicate and malformed row before verification, accepts th
 
 ## Outputs
 
-Each run writes three main artifacts:
+Each run writes the main campaign, audit, and billing artifacts:
 
 ### `runs/latest/verified_contacts.csv`
 
@@ -327,6 +329,7 @@ This file records:
 - Sendy import results
 - Campaign creation result
 - Consent attestation and basis
+- Invoice metadata
 
 ### `runs/latest/invoice_rows.csv`
 
@@ -366,6 +369,8 @@ https://github.com/xyufeng/helium-edm-ops/issues
 
 The first issue set covers dashboard polish, consent basis, per-client Sendy config, suppression lists, EmailListVerify status policy, deterministic deliverability checks, live Sendy discovery debugging, and automated dashboard smoke tests. That first roadmap pass is complete.
 
+Later roadmap work added production client wiring, multi-list selection, explicit live/dry-run execution mode, tracker-aligned invoice artifacts, and AWS Elastic Beanstalk deployment packaging.
+
 ## Real Usage
 
 After setting environment variables in `.env`, the real command for creating a Sendy draft is:
@@ -403,7 +408,16 @@ helium-edm \
 Repository/tool location:
 
 ```text
-TODO: add GitHub repository link after pushing
+https://github.com/xyufeng/helium-edm-ops
+```
+
+AWS deployment artifact:
+
+```text
+Elastic Beanstalk application: helium-edm-ops
+Region: ap-southeast-1
+Uploaded version: 8246c02-20260506143607
+Environment: pending explicit approval to create billable AWS resources
 ```
 
 Main files:
