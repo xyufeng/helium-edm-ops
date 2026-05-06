@@ -114,6 +114,11 @@ def create_app() -> Flask:
             dry_run = run_mode != "live" and request.form.get("dry_run", "on") == "on"
             import_to_sendy = request.form.get("import_to_sendy") == "on"
             create_campaign = request.form.get("create_campaign") == "on"
+            invoice_partner = request.form.get("invoice_partner", "").strip()
+            invoice_currency = request.form.get("invoice_currency", "SGD").strip()
+            invoice_campaign_fee = request.form.get("invoice_campaign_fee", "0").strip()
+            invoice_verification_unit_fee = request.form.get("invoice_verification_unit_fee", "0").strip()
+            invoice_list_fee = request.form.get("invoice_list_fee", "0").strip()
 
             run_id = time.strftime("%Y%m%d-%H%M%S")
             output_dir = Path("runs") / run_id
@@ -150,6 +155,11 @@ def create_app() -> Flask:
                 dry_run=dry_run,
                 import_to_sendy=import_to_sendy,
                 create_campaign=create_campaign,
+                invoice_partner=invoice_partner,
+                invoice_currency=invoice_currency,
+                invoice_campaign_fee=invoice_campaign_fee,
+                invoice_verification_unit_fee=invoice_verification_unit_fee,
+                invoice_list_fee=invoice_list_fee,
                 plan=plan,
                 assessments=assessments,
             )
@@ -470,6 +480,26 @@ DASHBOARD_TEMPLATE = """
             <label><input name="import_to_sendy" type="checkbox" checked> Upload accepted contacts to Sendy</label>
             <label><input name="create_campaign" type="checkbox" checked> Create Sendy draft campaign</label>
           </div>
+          <div class="notice">
+            <strong>Invoice</strong>
+            <div class="grid-two">
+              <label>Partner
+                <input name="invoice_partner" placeholder="Defaults to selected client">
+              </label>
+              <label>Currency
+                <input name="invoice_currency" value="SGD">
+              </label>
+              <label>Campaign fee
+                <input name="invoice_campaign_fee" inputmode="decimal" placeholder="0.00">
+              </label>
+              <label>Verification unit fee
+                <input name="invoice_verification_unit_fee" inputmode="decimal" placeholder="0.00">
+              </label>
+              <label>Per-list upload fee
+                <input name="invoice_list_fee" inputmode="decimal" placeholder="0.00">
+              </label>
+            </div>
+          </div>
           <button type="submit">Process Campaign</button>
         </form>
       </section>
@@ -489,6 +519,8 @@ DASHBOARD_TEMPLATE = """
             <a href="{{ url_for('static_run_file', filename='latest/rendered_edm.html') }}" target="_blank">Rendered EDM</a>
             <a href="{{ url_for('static_run_file', filename='latest/verified_contacts.csv') }}" target="_blank">Verified CSV</a>
             <a href="{{ url_for('static_run_file', filename='latest/run_report.json') }}" target="_blank">JSON report</a>
+            <a href="{{ url_for('static_run_file', filename='latest/invoice.html') }}" target="_blank">Invoice</a>
+            <a href="{{ url_for('static_run_file', filename='latest/invoice_rows.csv') }}" target="_blank">Invoice CSV</a>
           </div>
         </section>
       {% endif %}
@@ -676,6 +708,8 @@ REPORT_TEMPLATE = """
           <a href="rendered_edm.html" target="_blank">Rendered EDM</a>
           <a href="verified_contacts.csv" target="_blank">Verified CSV</a>
           <a href="run_report.json" target="_blank">JSON report</a>
+          <a href="invoice.html" target="_blank">Invoice</a>
+          <a href="invoice_rows.csv" target="_blank">Invoice CSV</a>
         </div>
       </section>
       <section class="status-grid">
@@ -707,6 +741,21 @@ REPORT_TEMPLATE = """
             <tr><th>Suppression file</th><td>{{ summary.suppression_file or "none" }}</td></tr>
           </tbody>
         </table>
+      </section>
+      <section class="panel">
+        <h2>Invoice</h2>
+        <table>
+          <tbody>
+            <tr><th>Invoice ID</th><td>{{ summary.invoice_id }}</td></tr>
+            <tr><th>Partner</th><td>{{ summary.invoice_partner }}</td></tr>
+            <tr><th>Total</th><td>{{ summary.invoice_currency }} {{ summary.invoice_total }}</td></tr>
+          </tbody>
+        </table>
+        <div class="links">
+          <a href="invoice.html" target="_blank">Printable invoice</a>
+          <a href="invoice_rows.csv" target="_blank">Google Sheet rows</a>
+          <a href="invoice.json" target="_blank">Invoice JSON</a>
+        </div>
       </section>
       <section class="panel">
         <h2>Processing Plan</h2>

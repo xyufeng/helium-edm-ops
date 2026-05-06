@@ -64,7 +64,8 @@ The dashboard lets the operator:
 - Run deterministic EDM deliverability checks
 - Upload accepted contacts into every selected Sendy list
 - Create a Sendy draft campaign
-- Open the generated report, rendered EDM, verified CSV, and JSON audit trail
+- Generate invoice artifacts for the partner billing handoff
+- Open the generated report, rendered EDM, verified CSV, invoice, and JSON audit trail
 
 Dry run is the default execution mode so the operator can inspect the plan and artifacts before touching live APIs. Live API mode uses EmailListVerify for verification and Sendy for contact import/draft creation.
 
@@ -122,6 +123,8 @@ Outputs:
 - `runs/latest/verified_contacts.csv`
 - `runs/latest/run_report.json`
 - `runs/latest/rendered_edm.html`
+- `runs/latest/invoice_rows.csv`
+- `runs/latest/invoice.html`
 
 Verification policy:
 
@@ -277,6 +280,7 @@ The generated human-readable report at `runs/latest/index.html` includes:
 - Execution mode and external action modes
 - Campaign readiness status
 - Links to rendered EDM, verified CSV, and JSON report
+- Links to Google-Sheet-ready invoice rows and printable invoice
 - Accepted/rejected/quarantined/suppressed/imported counts
 - Consent attestation
 - Campaign metadata

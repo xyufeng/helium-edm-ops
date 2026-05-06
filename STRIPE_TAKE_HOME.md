@@ -82,7 +82,8 @@ The tool:
 13. Records an operator consent attestation for the uploaded list.
 14. Imports accepted contacts into Sendy when enabled.
 15. Creates a Sendy draft, scheduled campaign, or send-now campaign.
-16. Writes an auditable run report.
+16. Generates partner invoice artifacts for the billing handoff.
+17. Writes an auditable run report.
 
 The tool is designed to run in `--dry-run` mode for demonstration without real API keys, and in live mode when Sendy, EmailListVerify, and optional OpenAI credentials are provided. In the normal workflow, it creates a Sendy campaign draft on the Helium Sendy instance so the campaign is ready for final review before sending.
 
@@ -327,6 +328,14 @@ This file records:
 - Campaign creation result
 - Consent attestation and basis
 
+### `runs/latest/invoice_rows.csv`
+
+This file is designed for my existing lightweight invoicing process: import or paste the rows into a Google Sheet, then export that sheet to PDF. It includes the partner, client, campaign, counts, selected billing rates, line items, and total.
+
+### `runs/latest/invoice.html`
+
+This is a printable invoice artifact for quick review. The Google Sheet remains the source for final PDF formatting, but the run now produces the structured billing data automatically.
+
 ### `runs/latest/rendered_edm.html`
 
 This is the final campaign HTML after the uploaded EDM body has been wrapped with the selected client's header and footer.
@@ -341,9 +350,9 @@ The full review is recorded in `EXPERT_REVIEW.md`. The most important recommenda
 2. Show the agent's processing plan before showing the final campaign payload.
 3. Say explicitly that the agent creates a review-ready draft and does not silently send.
 4. Show the client-specific header/footer to make the multi-client workflow obvious.
-5. Show `run_report.json`, `rendered_edm.html`, and `verified_contacts.csv` as the audit trail.
+5. Show `run_report.json`, `rendered_edm.html`, `verified_contacts.csv`, and `invoice_rows.csv` as the audit trail from campaign prep to billing.
 
-I implemented the highest-impact UI recommendation as part of the dashboard work: every dashboard run now writes a human-readable `runs/latest/index.html` report that summarizes the run for screen recording. The report shows campaign readiness, artifact links, verification counts, consent attestation, campaign metadata, processing plan, file assessment, warnings, deliverability checks, and Sendy campaign result.
+I implemented the highest-impact UI recommendation as part of the dashboard work: every dashboard run now writes a human-readable `runs/latest/index.html` report that summarizes the run for screen recording. The report shows campaign readiness, artifact links, verification counts, consent attestation, campaign metadata, processing plan, file assessment, warnings, deliverability checks, Sendy campaign result, and invoice artifacts.
 
 ## Roadmap
 

@@ -10,6 +10,7 @@ import sys
 import textwrap
 import time
 from dataclasses import asdict, dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -300,6 +301,146 @@ def load_client_config(client: str) -> ClientConfig:
 
 def parse_sendy_list_ids(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def parse_decimal(value: str | int | float | Decimal) -> Decimal:
+    try:
+        return Decimal(str(value or "0")).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        return Decimal("0.00")
+
+
+def format_money(value: Decimal, currency: str) -> str:
+    return f"{currency} {value:.2f}"
+
+
+def write_invoice_artifacts(
+    output_dir: Path,
+    summary: dict[str, Any],
+    *,
+    partner: str = "",
+    currency: str = "SGD",
+    campaign_fee: str = "0",
+    verification_unit_fee: str = "0",
+    list_fee: str = "0",
+) -> dict[str, Any]:
+    currency = (currency or "SGD").strip().upper()
+    partner = partner.strip() or summary.get("client", "Partner")
+    campaign_amount = parse_decimal(campaign_fee)
+    verification_rate = parse_decimal(verification_unit_fee)
+    list_rate = parse_decimal(list_fee)
+    contacts_read = int(summary.get("contacts_read", 0) or 0)
+    list_count = len(summary.get("sendy_list_ids") or [])
+
+    line_items = [
+        {
+            "description": "EDM campaign operations and Sendy draft setup",
+            "quantity": 1,
+            "unit_price": campaign_amount,
+            "amount": campaign_amount,
+        },
+        {
+            "description": "Email list verification",
+            "quantity": contacts_read,
+            "unit_price": verification_rate,
+            "amount": (verification_rate * contacts_read).quantize(Decimal("0.01")),
+        },
+        {
+            "description": "Sendy list upload destinations",
+            "quantity": list_count,
+            "unit_price": list_rate,
+            "amount": (list_rate * list_count).quantize(Decimal("0.01")),
+        },
+    ]
+    total = sum((item["amount"] for item in line_items), Decimal("0.00")).quantize(Decimal("0.01"))
+    invoice_id = f"HE-{time.strftime('%Y%m%d-%H%M%S')}"
+    invoice = {
+        "invoice_id": invoice_id,
+        "date": time.strftime("%Y-%m-%d"),
+        "partner": partner,
+        "currency": currency,
+        "client": summary.get("client", ""),
+        "subject": summary.get("subject", ""),
+        "mode": summary.get("mode", ""),
+        "contacts_read": contacts_read,
+        "accepted": summary.get("accepted", 0),
+        "rejected": summary.get("rejected", 0),
+        "quarantined": summary.get("quarantined", 0),
+        "suppressed": summary.get("suppressed", 0),
+        "sendy_lists": summary.get("sendy_list_id", ""),
+        "line_items": [
+            {
+                **item,
+                "unit_price": str(item["unit_price"]),
+                "amount": str(item["amount"]),
+            }
+            for item in line_items
+        ],
+        "total": str(total),
+    }
+
+    (output_dir / "invoice.json").write_text(json.dumps(invoice, indent=2), encoding="utf-8")
+    with (output_dir / "invoice_rows.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Invoice ID", invoice_id])
+        writer.writerow(["Date", invoice["date"]])
+        writer.writerow(["Partner", partner])
+        writer.writerow(["Client", invoice["client"]])
+        writer.writerow(["Campaign", invoice["subject"]])
+        writer.writerow(["Mode", invoice["mode"]])
+        writer.writerow([])
+        writer.writerow(["Description", "Quantity", "Unit price", "Amount"])
+        for item in line_items:
+            writer.writerow([item["description"], item["quantity"], format_money(item["unit_price"], currency), format_money(item["amount"], currency)])
+        writer.writerow([])
+        writer.writerow(["Total", "", "", format_money(total, currency)])
+
+    rows = "\n".join(
+        "<tr>"
+        f"<td>{html.escape(item['description'])}</td>"
+        f"<td>{item['quantity']}</td>"
+        f"<td>{html.escape(format_money(item['unit_price'], currency))}</td>"
+        f"<td>{html.escape(format_money(item['amount'], currency))}</td>"
+        "</tr>"
+        for item in line_items
+    )
+    invoice_html = textwrap.dedent(
+        f"""
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <title>{html.escape(invoice_id)} Invoice</title>
+            <style>
+              body {{ font-family: Arial, sans-serif; color: #111827; margin: 40px; }}
+              h1 {{ margin-bottom: 4px; }}
+              table {{ border-collapse: collapse; width: 100%; margin-top: 24px; }}
+              th, td {{ border-bottom: 1px solid #d1d5db; padding: 10px; text-align: left; }}
+              th {{ background: #f3f4f6; }}
+              .total {{ font-size: 22px; font-weight: 700; text-align: right; margin-top: 24px; }}
+              .meta {{ color: #4b5563; line-height: 1.6; }}
+            </style>
+          </head>
+          <body>
+            <h1>Invoice {html.escape(invoice_id)}</h1>
+            <div class="meta">
+              <div>Date: {html.escape(invoice["date"])}</div>
+              <div>Partner: {html.escape(partner)}</div>
+              <div>Client: {html.escape(str(invoice["client"]))}</div>
+              <div>Campaign: {html.escape(str(invoice["subject"]))}</div>
+              <div>Mode: {html.escape(str(invoice["mode"]))}</div>
+            </div>
+            <table>
+              <thead><tr><th>Description</th><th>Quantity</th><th>Unit price</th><th>Amount</th></tr></thead>
+              <tbody>{rows}</tbody>
+            </table>
+            <div class="total">Total: {html.escape(format_money(total, currency))}</div>
+          </body>
+        </html>
+        """
+    ).strip()
+    (output_dir / "invoice.html").write_text(invoice_html, encoding="utf-8")
+    return invoice
 
 
 def csv_has_email_column(path: Path) -> tuple[bool, str]:
@@ -682,6 +823,7 @@ def write_report(
     create_campaign: bool,
     sendy_list_ids: list[str] | None = None,
     sendy_brand_id: str = "",
+    invoice: dict[str, Any] | None = None,
     consent_basis: str = "",
     consent_confirmed: bool = False,
     plan: IntakePlan | None = None,
@@ -728,6 +870,7 @@ def write_report(
         "ai_preflight": ai_result,
         "sendy_import": sendy_results,
         "campaign_result": campaign_result,
+        "invoice": invoice or {},
     }
     (output_dir / "run_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 
@@ -762,6 +905,11 @@ def process_campaign(
     schedule_date_time: str = "",
     schedule_timezone: str = "Asia/Singapore",
     verification_pause: float = 0.0,
+    invoice_partner: str = "",
+    invoice_currency: str = "SGD",
+    invoice_campaign_fee: str = "0",
+    invoice_verification_unit_fee: str = "0",
+    invoice_list_fee: str = "0",
     plan: IntakePlan | None = None,
     assessments: list[FileAssessment] | None = None,
 ) -> dict[str, Any]:
@@ -841,26 +989,7 @@ def process_campaign(
             schedule_timezone=schedule_timezone,
         )
 
-    write_report(
-        output_dir,
-        verified,
-        warnings,
-        ai_result,
-        sendy_results,
-        campaign_result,
-        dry_run,
-        import_to_sendy,
-        create_campaign,
-        sendy_list_ids=list_ids,
-        sendy_brand_id=brand_id,
-        consent_basis=consent_basis,
-        consent_confirmed=consent_confirmed,
-        plan=plan,
-        assessments=assessments,
-        rendered_html_path=rendered_html_path,
-    )
-
-    return {
+    summary = {
         "subject": subject,
         "client": client,
         "contacts_file": str(contacts_path),
@@ -890,6 +1019,41 @@ def process_campaign(
         "sendy_imported": len(sendy_results),
         "sendy_imported_contacts": len(accepted) if sendy_results else 0,
     }
+    invoice = write_invoice_artifacts(
+        output_dir,
+        summary,
+        partner=invoice_partner,
+        currency=invoice_currency,
+        campaign_fee=invoice_campaign_fee,
+        verification_unit_fee=invoice_verification_unit_fee,
+        list_fee=invoice_list_fee,
+    )
+    summary["invoice_id"] = invoice["invoice_id"]
+    summary["invoice_total"] = invoice["total"]
+    summary["invoice_currency"] = invoice["currency"]
+    summary["invoice_partner"] = invoice["partner"]
+
+    write_report(
+        output_dir,
+        verified,
+        warnings,
+        ai_result,
+        sendy_results,
+        campaign_result,
+        dry_run,
+        import_to_sendy,
+        create_campaign,
+        sendy_list_ids=list_ids,
+        sendy_brand_id=brand_id,
+        invoice=invoice,
+        consent_basis=consent_basis,
+        consent_confirmed=consent_confirmed,
+        plan=plan,
+        assessments=assessments,
+        rendered_html_path=rendered_html_path,
+    )
+
+    return summary
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -925,6 +1089,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--schedule-date-time", default="", help='Example: "June 15, 2026 6:05pm".')
     parser.add_argument("--schedule-timezone", default="Asia/Singapore")
     parser.add_argument("--verification-pause", type=float, default=0.0, help="Seconds between EmailListVerify calls.")
+    parser.add_argument("--invoice-partner", default="", help="Partner/customer name for invoice artifacts.")
+    parser.add_argument("--invoice-currency", default="SGD", help="Invoice currency code.")
+    parser.add_argument("--invoice-campaign-fee", default="0", help="Flat campaign operations fee.")
+    parser.add_argument("--invoice-verification-unit-fee", default="0", help="Per-contact verification fee.")
+    parser.add_argument("--invoice-list-fee", default="0", help="Per selected Sendy list upload fee.")
     return parser
 
 
@@ -1015,6 +1184,11 @@ def main(argv: list[str] | None = None) -> int:
         schedule_date_time=args.schedule_date_time,
         schedule_timezone=args.schedule_timezone,
         verification_pause=args.verification_pause,
+        invoice_partner=args.invoice_partner,
+        invoice_currency=args.invoice_currency,
+        invoice_campaign_fee=args.invoice_campaign_fee,
+        invoice_verification_unit_fee=args.invoice_verification_unit_fee,
+        invoice_list_fee=args.invoice_list_fee,
         plan=plan,
         assessments=assessments,
     )

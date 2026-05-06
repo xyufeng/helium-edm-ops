@@ -32,6 +32,11 @@ def test_dashboard_login_upload_and_artifacts(tmp_path, monkeypatch):
                             "dry_run": "on",
                             "import_to_sendy": "on",
                             "create_campaign": "on",
+                            "invoice_partner": "Test Partner",
+                            "invoice_currency": "SGD",
+                            "invoice_campaign_fee": "100",
+                            "invoice_verification_unit_fee": "0.01",
+                            "invoice_list_fee": "5",
                             "contacts": (contacts, "client-list-may.csv"),
                             "edm": (edm, "export-growth-edm.html"),
                             "notes": (notes, "campaign-notes.txt"),
@@ -47,10 +52,14 @@ def test_dashboard_login_upload_and_artifacts(tmp_path, monkeypatch):
     assert Path("runs/latest/run_report.json").exists()
     assert Path("runs/latest/rendered_edm.html").exists()
     assert Path("runs/latest/verified_contacts.csv").exists()
+    assert Path("runs/latest/invoice.html").exists()
+    assert Path("runs/latest/invoice_rows.csv").exists()
+    assert Path("runs/latest/invoice.json").exists()
 
     report = Path("runs/latest/index.html").read_text(encoding="utf-8")
     assert "Consent Attestation" in report
     assert "Deliverability Checks" in report
+    assert "Invoice" in report
     assert "Suppressed" in report
 
     csv_text = Path("runs/latest/verified_contacts.csv").read_text(encoding="utf-8")
