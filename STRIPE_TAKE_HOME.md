@@ -76,7 +76,7 @@ The tool:
 7. Adds the correct client-specific header and footer to the EDM.
 8. Normalizes and deduplicates emails.
 9. Rejects malformed addresses before paid verification.
-10. Verifies emails through EmailListVerify and separates accepted, rejected, and quarantined outcomes.
+10. Verifies emails through EmailListVerify and separates accepted, rejected, quarantined, and suppressed outcomes.
 11. Converts the final EDM HTML into a plain-text fallback.
 12. Runs deterministic deliverability checks and an AI preflight review on the EDM content.
 13. Records an operator consent attestation for the uploaded list.
@@ -297,6 +297,7 @@ This file records every usable contact after local validation, including:
 - Name
 - Verification status
 - Disposition: accepted, rejected, or quarantine
+- Suppression reason when applicable
 - Whether the contact was accepted
 - Reason
 
@@ -310,6 +311,7 @@ This file records:
 - Selected client wrapper
 - Input warnings
 - Accepted/rejected/quarantined verification counts
+- Suppressed contact counts
 - AI preflight result
 - Deterministic deliverability checks
 - Sendy import results

@@ -40,6 +40,12 @@ class VerifiedContact:
 
 
 @dataclass(frozen=True)
+class SuppressionEntry:
+    email: str
+    reason: str = "suppressed"
+
+
+@dataclass(frozen=True)
 class FileAssessment:
     path: str
     role: str
@@ -126,6 +132,66 @@ def read_contacts(csv_path: Path, email_column: str = "email", name_column: str 
             contacts.append(Contact(email=email_address, name=name, source_row=row_number))
 
     return contacts, warnings
+
+
+def read_suppression_list(path: Path | None) -> dict[str, SuppressionEntry]:
+    if not path or not path.exists():
+        return {}
+    entries: dict[str, SuppressionEntry] = {}
+    if path.suffix.lower() == ".json":
+        data = json.loads(path.read_text(encoding="utf-8"))
+        rows = data if isinstance(data, list) else data.get("suppressions", []) if isinstance(data, dict) else []
+        for row in rows:
+            if isinstance(row, str):
+                email_address = normalize_email(row)
+                reason = "suppressed"
+            elif isinstance(row, dict):
+                email_address = normalize_email(str(row.get("email", "")))
+                reason = str(row.get("reason", "suppressed")).strip() or "suppressed"
+            else:
+                continue
+            if email_address:
+                entries[email_address] = SuppressionEntry(email=email_address, reason=reason)
+        return entries
+
+    with path.open(newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        if not reader.fieldnames:
+            return {}
+        fields = {field.strip().lower(): field for field in reader.fieldnames}
+        email_field = fields.get("email") or fields.get("email address") or fields.get("e-mail")
+        reason_field = fields.get("reason")
+        if not email_field:
+            return {}
+        for row in reader:
+            email_address = normalize_email(row.get(email_field, ""))
+            if not email_address:
+                continue
+            reason = (row.get(reason_field, "") if reason_field else "").strip() or "suppressed"
+            entries[email_address] = SuppressionEntry(email=email_address, reason=reason)
+    return entries
+
+
+def apply_suppression(verified: list[VerifiedContact], suppressions: dict[str, SuppressionEntry]) -> list[VerifiedContact]:
+    if not suppressions:
+        return verified
+    updated: list[VerifiedContact] = []
+    for contact in verified:
+        suppression = suppressions.get(contact.email)
+        if suppression and contact.accepted:
+            updated.append(
+                VerifiedContact(
+                    email=contact.email,
+                    name=contact.name,
+                    status=contact.status,
+                    disposition="suppressed",
+                    accepted=False,
+                    reason=f"suppressed: {suppression.reason}",
+                )
+            )
+        else:
+            updated.append(contact)
+    return updated
 
 
 def html_to_plain_text(html_text: str) -> str:
@@ -600,6 +666,7 @@ def write_report(
     accepted = [item for item in verified if item.accepted]
     rejected = [item for item in verified if not item.accepted]
     quarantined = [item for item in verified if item.disposition == "quarantine"]
+    suppressed = [item for item in verified if item.disposition == "suppressed"]
     rejected_only = [item for item in verified if item.disposition == "rejected"]
 
     with (output_dir / "verified_contacts.csv").open("w", newline="", encoding="utf-8") as f:
@@ -613,6 +680,7 @@ def write_report(
             "accepted": len(accepted),
             "rejected": len(rejected_only),
             "quarantined": len(quarantined),
+            "suppressed": len(suppressed),
             "warnings": len(warnings),
         },
         "file_assessments": [asdict(item) for item in assessments or []],
@@ -648,6 +716,7 @@ def process_campaign(
     client_note: str = "",
     consent_basis: str = "",
     consent_confirmed: bool = False,
+    suppression_path: Path | None = None,
     email_column: str = "email",
     name_column: str = "name",
     accepted_statuses: set[str] | None = None,
@@ -690,8 +759,11 @@ def process_campaign(
     plain_text = html_to_plain_text(html_text)
     contacts, warnings = read_contacts(contacts_path, email_column, name_column)
     verified = verify_contacts(contacts, accepted_statuses, quarantine_statuses, dry_run, verification_pause)
+    suppressions = read_suppression_list(suppression_path)
+    verified = apply_suppression(verified, suppressions)
     accepted = [item for item in verified if item.accepted]
     quarantined = [item for item in verified if item.disposition == "quarantine"]
+    suppressed = [item for item in verified if item.disposition == "suppressed"]
     rejected_only = [item for item in verified if item.disposition == "rejected"]
 
     ai_result = ai_preflight(html_text, plain_text, subject, client_note)
@@ -755,6 +827,7 @@ def process_campaign(
         "accepted": len(accepted),
         "rejected": len(rejected_only),
         "quarantined": len(quarantined),
+        "suppressed": len(suppressed),
         "warnings": len(warnings),
         "rendered_html": str(rendered_html_path),
         "campaign_result": campaign_result,
@@ -765,6 +838,7 @@ def process_campaign(
         "reply_to": reply_to,
         "consent_basis": consent_basis,
         "consent_confirmed": consent_confirmed,
+        "suppression_file": str(suppression_path) if suppression_path else "",
         "output_dir": str(output_dir),
         "sendy_imported": len(sendy_results),
     }
@@ -785,6 +859,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--client-note", default="", help="Context for AI preflight.")
     parser.add_argument("--consent-basis", default="", help="Audit note for why this list is permissioned.")
     parser.add_argument("--confirm-consent", action="store_true", help="Confirm uploaded list has provided consent. Required for live Sendy actions.")
+    parser.add_argument("--suppression-list", type=Path, help="CSV or JSON suppression list. Suppressed accepted contacts are not uploaded.")
     parser.add_argument("--list-id", default="", help="Sendy list ID to import/send to. Defaults from client config when available.")
     parser.add_argument("--brand-id", default="", help="Sendy brand ID for draft creation.")
     parser.add_argument("--from-name", default="", help="Override sender name.")
@@ -880,6 +955,7 @@ def main(argv: list[str] | None = None) -> int:
         client_note=args.client_note,
         consent_basis=args.consent_basis,
         consent_confirmed=args.confirm_consent,
+        suppression_path=args.suppression_list,
         email_column=args.email_column,
         name_column=args.name_column,
         accepted_statuses=set(args.accepted_status),

@@ -115,6 +115,9 @@ def create_app() -> Flask:
             save_upload(request.files.get("contacts"), input_dir, "contacts")
             save_upload(request.files.get("edm"), input_dir, "edm")
             save_optional_upload(request.files.get("notes"), input_dir)
+            suppression_path = save_optional_upload(request.files.get("suppression"), input_dir)
+            if suppression_path == input_dir:
+                suppression_path = None
 
             header_path, footer_path = resolve_client_templates(client, None, None)
             plan, assessments = build_intake_plan(input_dir, subject, client, header_path, footer_path)
@@ -135,6 +138,7 @@ def create_app() -> Flask:
                 client_note=client_note,
                 consent_basis=consent_basis,
                 consent_confirmed=consent_confirmed,
+                suppression_path=suppression_path,
                 dry_run=dry_run,
                 import_to_sendy=import_to_sendy,
                 create_campaign=create_campaign,
@@ -405,6 +409,9 @@ DASHBOARD_TEMPLATE = """
           <label>Campaign notes
             <input name="notes" type="file" accept=".txt,.md,.json">
           </label>
+          <label>Suppression list
+            <input name="suppression" type="file" accept=".csv,.json">
+          </label>
           <label>Operator note
             <textarea name="client_note" rows="3" placeholder="Context for AI preflight"></textarea>
           </label>
@@ -440,7 +447,7 @@ DASHBOARD_TEMPLATE = """
             <div><strong>{{ latest.summary.client }}</strong><span>Client</span></div>
             <div><strong>{{ latest.summary.accepted }}</strong><span>Accepted</span></div>
             <div><strong>{{ latest.summary.rejected }}</strong><span>Rejected</span></div>
-            <div><strong>{{ latest.summary.warnings }}</strong><span>Warnings</span></div>
+            <div><strong>{{ latest.summary.suppressed }}</strong><span>Suppressed</span></div>
           </div>
           <div class="links">
             <a href="{{ url_for('static_run_file', filename='latest/index.html') }}" target="_blank">Human report</a>
@@ -582,6 +589,7 @@ REPORT_TEMPLATE = """
         <article class="panel"><div class="eyebrow">Accepted</div><h2>{{ summary.accepted }}</h2></article>
         <article class="panel"><div class="eyebrow">Rejected</div><h2>{{ summary.rejected }}</h2></article>
         <article class="panel"><div class="eyebrow">Quarantined</div><h2>{{ summary.quarantined }}</h2></article>
+        <article class="panel"><div class="eyebrow">Suppressed</div><h2>{{ summary.suppressed }}</h2></article>
         <article class="panel"><div class="eyebrow">Imported</div><h2>{{ summary.sendy_imported }}</h2></article>
       </section>
       <section class="panel">

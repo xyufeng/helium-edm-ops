@@ -60,6 +60,7 @@ The dashboard lets the operator:
 - Record consent attestation for the uploaded list
 - Run the verification/list hygiene workflow
 - Separate accepted, rejected, and quarantined verification outcomes
+- Apply an optional suppression list before Sendy upload
 - Run deterministic EDM deliverability checks
 - Upload accepted contacts into Sendy
 - Create a Sendy draft campaign
@@ -123,6 +124,12 @@ Verification policy:
 - Everything else is rejected.
 
 Raw EmailListVerify status and the final disposition are both written to `verified_contacts.csv`.
+
+Suppression lists:
+
+- Pass `--suppression-list path/to/suppression.csv` or upload a suppression CSV/JSON in the dashboard.
+- Suppression CSVs should include `email` and optional `reason` columns.
+- Suppressed contacts are not uploaded to Sendy and are reported with disposition `suppressed`.
 
 Deliverability checks:
 
