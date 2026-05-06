@@ -60,6 +60,7 @@ The dashboard lets the operator:
 - Record consent attestation for the uploaded list
 - Run the verification/list hygiene workflow
 - Separate accepted, rejected, and quarantined verification outcomes
+- Run deterministic EDM deliverability checks
 - Upload accepted contacts into Sendy
 - Create a Sendy draft campaign
 - Open the generated report, rendered EDM, verified CSV, and JSON audit trail
@@ -122,6 +123,17 @@ Verification policy:
 - Everything else is rejected.
 
 Raw EmailListVerify status and the final disposition are both written to `verified_contacts.csv`.
+
+Deliverability checks:
+
+- Unsubscribe link/text presence
+- HTTPS links
+- Plain-text fallback
+- Image alt text
+- HTML size
+- Required footer text from client config
+
+Blocking deliverability errors stop live Sendy campaign creation. Dry-runs still produce the report for review.
 
 ## Real Sendy draft
 

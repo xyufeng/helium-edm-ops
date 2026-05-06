@@ -18,6 +18,8 @@ import requests
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 TAG_RE = re.compile(r"<[^>]+>")
 WS_RE = re.compile(r"\s+")
+HREF_RE = re.compile(r"(?is)<a\b[^>]*\bhref=[\"']([^\"']+)[\"'][^>]*>")
+IMG_RE = re.compile(r"(?is)<img\b([^>]*)>")
 
 
 @dataclass(frozen=True)
@@ -544,17 +546,41 @@ def ai_preflight(html_text: str, plain_text: str, subject: str, client_note: str
 
 
 def deterministic_checks(html_text: str, plain_text: str, subject: str) -> list[str]:
-    checks: list[str] = []
+    return [item["message"] for item in deliverability_checks(html_text, plain_text, subject)]
+
+
+def deliverability_checks(html_text: str, plain_text: str, subject: str, required_footer_text: str = "") -> list[dict[str, str]]:
+    structured: list[dict[str, str]] = []
     lower_html = html_text.lower()
+
+    def add(severity: str, code: str, message: str) -> None:
+        structured.append({"severity": severity, "code": code, "message": message})
+
     if "[unsubscribe]" not in lower_html and "unsubscribe" not in lower_html:
-        checks.append("No obvious unsubscribe text/tag found.")
+        add("error", "missing_unsubscribe", "No obvious unsubscribe text/tag found.")
     if len(subject) > 80:
-        checks.append("Subject is longer than 80 characters.")
+        add("warning", "long_subject", "Subject is longer than 80 characters.")
     if not plain_text:
-        checks.append("Plain text version is empty.")
-    if "http://" in lower_html:
-        checks.append("Non-HTTPS link detected.")
-    return checks or ["No deterministic issues found."]
+        add("error", "missing_plain_text", "Plain text version is empty.")
+
+    for href in HREF_RE.findall(html_text):
+        normalized = href.strip().lower()
+        if normalized.startswith("http://"):
+            add("warning", "non_https_link", f"Non-HTTPS link detected: {href.strip()}")
+        if not normalized or normalized == "#":
+            add("warning", "empty_link", "Empty or placeholder link detected.")
+
+    for img_attrs in IMG_RE.findall(html_text):
+        if not re.search(r"(?is)\balt\s*=", img_attrs):
+            add("warning", "missing_image_alt", "Image tag is missing alt text.")
+
+    if len(html_text.encode("utf-8")) > 100_000:
+        add("warning", "large_html", "HTML is larger than 100 KB.")
+
+    if required_footer_text and required_footer_text.lower() not in lower_html:
+        add("error", "missing_required_footer_text", f"Required footer text not found: {required_footer_text}")
+
+    return structured or [{"severity": "ok", "code": "ok", "message": "No deterministic issues found."}]
 
 
 def write_report(
@@ -669,6 +695,12 @@ def process_campaign(
     rejected_only = [item for item in verified if item.disposition == "rejected"]
 
     ai_result = ai_preflight(html_text, plain_text, subject, client_note)
+    delivery_checks = deliverability_checks(html_text, plain_text, subject, client_config.required_footer_text)
+    ai_result["deterministic_checks"] = delivery_checks
+    blocking_checks = [item for item in delivery_checks if item["severity"] == "error"]
+    if not dry_run and create_campaign and blocking_checks:
+        messages = "; ".join(item["message"] for item in blocking_checks)
+        raise ValueError(f"Blocking deliverability checks failed: {messages}")
 
     sendy = SendyClient(env("SENDY_BASE_URL"), env("SENDY_API_KEY"), dry_run)
     if not dry_run and (import_to_sendy or create_campaign):

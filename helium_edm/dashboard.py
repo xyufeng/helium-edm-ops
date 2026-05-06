@@ -266,6 +266,7 @@ def render_dashboard_report(summary: dict[str, Any], report: dict[str, Any]) -> 
     plan = report.get("processing_plan") or {}
     assessments = report.get("file_assessments") or []
     warnings = report.get("warnings") or []
+    delivery_checks = (report.get("ai_preflight") or {}).get("deterministic_checks") or []
     return render_template_string(
         REPORT_TEMPLATE,
         title=APP_TITLE,
@@ -274,6 +275,7 @@ def render_dashboard_report(summary: dict[str, Any], report: dict[str, Any]) -> 
         plan=plan,
         assessments=assessments,
         warnings=warnings,
+        delivery_checks=delivery_checks,
         report=report,
     )
 
@@ -605,6 +607,17 @@ REPORT_TEMPLATE = """
       <section class="panel">
         <h2>Warnings</h2>
         {% if warnings %}<ul>{% for warning in warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% else %}<p>No warnings.</p>{% endif %}
+      </section>
+      <section class="panel">
+        <h2>Deliverability Checks</h2>
+        <table>
+          <thead><tr><th>Severity</th><th>Code</th><th>Message</th></tr></thead>
+          <tbody>
+            {% for item in delivery_checks %}
+              <tr><td>{{ item.severity }}</td><td>{{ item.code }}</td><td>{{ item.message }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </section>
       <section class="panel">
         <h2>Campaign Result</h2>

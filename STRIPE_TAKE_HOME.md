@@ -78,7 +78,7 @@ The tool:
 9. Rejects malformed addresses before paid verification.
 10. Verifies emails through EmailListVerify and separates accepted, rejected, and quarantined outcomes.
 11. Converts the final EDM HTML into a plain-text fallback.
-12. Runs an AI preflight review on the EDM content.
+12. Runs deterministic deliverability checks and an AI preflight review on the EDM content.
 13. Records an operator consent attestation for the uploaded list.
 14. Imports accepted contacts into Sendy when enabled.
 15. Creates a Sendy draft, scheduled campaign, or send-now campaign.
@@ -311,6 +311,7 @@ This file records:
 - Input warnings
 - Accepted/rejected/quarantined verification counts
 - AI preflight result
+- Deterministic deliverability checks
 - Sendy import results
 - Campaign creation result
 - Consent attestation and basis
