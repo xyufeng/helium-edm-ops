@@ -101,7 +101,8 @@ def create_app() -> Flask:
         try:
             client = slugify_client(request.form.get("client", "default"))
             subject = request.form.get("subject", "").strip()
-            list_id = request.form.get("list_id", "").strip()
+            selected_list_ids = [item.strip() for item in request.form.getlist("list_id") if item.strip()]
+            list_id = ",".join(selected_list_ids) or request.form.get("list_id", "").strip()
             brand_id = request.form.get("brand_id", "").strip()
             from_name = request.form.get("from_name", "").strip()
             from_email = request.form.get("from_email", "").strip()
@@ -407,8 +408,8 @@ DASHBOARD_TEMPLATE = """
                   <option value="">Load brands to choose</option>
                 </select>
               </label>
-              <label>Sendy list
-                <select id="sendy-list-select">
+              <label>Sendy lists
+                <select id="sendy-list-select" name="list_id" multiple required size="8">
                   <option value="">Choose a brand first</option>
                 </select>
               </label>
@@ -419,14 +420,7 @@ DASHBOARD_TEMPLATE = """
             </div>
             <p id="sendy-discovery-status" class="muted"></p>
           </div>
-          <div class="grid-two">
-            <label>Sendy list ID
-              <input id="list-id-input" name="list_id" required placeholder="Sendy recipient list ID">
-            </label>
-            <label>Sendy brand ID
-              <input id="brand-id-input" name="brand_id" placeholder="Required for draft creation">
-            </label>
-          </div>
+          <input id="brand-id-input" name="brand_id" type="hidden">
           <div class="grid-two">
             <label>From name
               <input id="from-name-input" name="from_name" placeholder="Defaults from client config or env">
@@ -503,7 +497,6 @@ DASHBOARD_TEMPLATE = """
       const listSelect = document.getElementById('sendy-list-select');
       const clientSelect = document.getElementById('client-select');
       const brandInput = document.getElementById('brand-id-input');
-      const listInput = document.getElementById('list-id-input');
       const fromNameInput = document.getElementById('from-name-input');
       const fromEmailInput = document.getElementById('from-email-input');
       const replyToInput = document.getElementById('reply-to-input');
@@ -527,10 +520,12 @@ DASHBOARD_TEMPLATE = """
 
       function fillSelect(select, rows, placeholder) {
         select.innerHTML = '';
-        const first = document.createElement('option');
-        first.value = '';
-        first.textContent = placeholder;
-        select.appendChild(first);
+        if (!select.multiple) {
+          const first = document.createElement('option');
+          first.value = '';
+          first.textContent = placeholder;
+          select.appendChild(first);
+        }
         rows.forEach((row) => {
           const id = rowId(row);
           if (!id) return;
@@ -539,6 +534,33 @@ DASHBOARD_TEMPLATE = """
           option.textContent = `${rowName(row)} (${id})`;
           select.appendChild(option);
         });
+        if (select.multiple && !rows.length) {
+          const empty = document.createElement('option');
+          empty.value = '';
+          empty.textContent = placeholder;
+          select.appendChild(empty);
+        }
+      }
+
+      function parseListIds(value) {
+        return (value || '').split(',').map((item) => item.trim()).filter(Boolean);
+      }
+
+      function selectedListIds() {
+        return Array.from(listSelect.selectedOptions).map((option) => option.value).filter(Boolean);
+      }
+
+      function selectListIds(value) {
+        const ids = parseListIds(value);
+        Array.from(listSelect.options).forEach((option) => {
+          option.selected = ids.includes(option.value);
+        });
+      }
+
+      function listStatusText() {
+        const count = selectedListIds().length;
+        if (!count) return 'Choose one or more Sendy lists.';
+        return `${count} Sendy list${count === 1 ? '' : 's'} selected.`;
       }
 
       async function fetchJson(url) {
@@ -573,9 +595,9 @@ DASHBOARD_TEMPLATE = """
         statusEl.textContent = 'Loading Sendy lists...';
         try {
           const payload = await fetchJson(`{{ url_for("sendy_lists") }}?brand_id=${encodeURIComponent(brandId)}`);
-          fillSelect(listSelect, normalizeRows(payload.lists), 'Choose a list');
-          if (preselectListId) listSelect.value = preselectListId;
-          statusEl.textContent = preselectListId ? 'Client list loaded.' : 'Lists loaded.';
+          fillSelect(listSelect, normalizeRows(payload.lists), 'No lists found for this brand');
+          if (preselectListId) selectListIds(preselectListId);
+          statusEl.textContent = preselectListId ? `Client lists loaded. ${listStatusText()}` : `Lists loaded. ${listStatusText()}`;
         } catch (error) {
           statusEl.textContent = error.message;
         }
@@ -587,12 +609,11 @@ DASHBOARD_TEMPLATE = """
       brandSelect.addEventListener('change', async () => {
         brandInput.value = brandSelect.value;
         listSelect.innerHTML = '<option value="">Load lists for this brand</option>';
-        listInput.value = '';
         if (brandSelect.value) await loadLists(brandSelect.value);
       });
 
       listSelect.addEventListener('change', () => {
-        listInput.value = listSelect.value;
+        statusEl.textContent = listStatusText();
       });
 
       async function loadClientConfig() {
@@ -600,7 +621,6 @@ DASHBOARD_TEMPLATE = """
           const payload = await fetchJson(`/client-config/${encodeURIComponent(clientSelect.value)}`);
           const config = payload.config || {};
           brandInput.value = config.sendy_brand_id || '';
-          listInput.value = config.sendy_list_id || '';
           fromNameInput.value = config.from_name || '';
           fromEmailInput.value = config.from_email || '';
           replyToInput.value = config.reply_to || '';
@@ -664,7 +684,7 @@ REPORT_TEMPLATE = """
         <article class="panel"><div class="eyebrow">Rejected</div><h2>{{ summary.rejected }}</h2></article>
         <article class="panel"><div class="eyebrow">Quarantined</div><h2>{{ summary.quarantined }}</h2></article>
         <article class="panel"><div class="eyebrow">Suppressed</div><h2>{{ summary.suppressed }}</h2></article>
-        <article class="panel"><div class="eyebrow">Imported</div><h2>{{ summary.sendy_imported }}</h2></article>
+        <article class="panel"><div class="eyebrow">Sendy imports</div><h2>{{ summary.sendy_imported }}</h2></article>
       </section>
       <section class="panel">
         <h2>Consent Attestation</h2>
@@ -676,8 +696,8 @@ REPORT_TEMPLATE = """
         <table>
           <tbody>
             <tr><th>Subject</th><td>{{ summary.subject }}</td></tr>
-            <tr><th>Sendy brand ID</th><td>{{ summary.sendy_brand_id }}</td></tr>
-            <tr><th>Sendy list ID</th><td>{{ summary.sendy_list_id }}</td></tr>
+            <tr><th>Sendy brand</th><td>{{ summary.sendy_brand_id }}</td></tr>
+            <tr><th>Sendy lists</th><td>{{ summary.sendy_list_id }}</td></tr>
             <tr><th>From</th><td>{{ summary.from_name }} &lt;{{ summary.from_email }}&gt;</td></tr>
             <tr><th>Reply-to</th><td>{{ summary.reply_to }}</td></tr>
             <tr><th>Suppression file</th><td>{{ summary.suppression_file or "none" }}</td></tr>

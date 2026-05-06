@@ -56,13 +56,13 @@ The dashboard lets the operator:
 - Upload the EDM HTML and contact list CSV
 - See EmailListVerify and Sendy configuration status
 - Fetch Sendy brands and lists automatically when the Sendy API key is configured
-- Auto-fill Sendy brand ID and list ID from discovery
+- Choose one or more Sendy lists by name after discovery
 - Record consent attestation for the uploaded list
 - Run the verification/list hygiene workflow
 - Separate accepted, rejected, and quarantined verification outcomes
 - Apply an optional suppression list before Sendy upload
 - Run deterministic EDM deliverability checks
-- Upload accepted contacts into Sendy
+- Upload accepted contacts into every selected Sendy list
 - Create a Sendy draft campaign
 - Open the generated report, rendered EDM, verified CSV, and JSON audit trail
 
@@ -226,7 +226,7 @@ Supported fields:
 - `display_name`
 - `sendy_brand_id`
 - `sendy_brand_name`
-- `sendy_list_id`
+- `sendy_list_id` for an optional default list, or comma-separated default lists
 - `from_name`
 - `from_email`
 - `reply_to`

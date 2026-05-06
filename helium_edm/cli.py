@@ -298,6 +298,10 @@ def load_client_config(client: str) -> ClientConfig:
     )
 
 
+def parse_sendy_list_ids(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 def csv_has_email_column(path: Path) -> tuple[bool, str]:
     try:
         with path.open(newline="", encoding="utf-8-sig") as f:
@@ -753,6 +757,8 @@ def process_campaign(
     consent_basis = consent_basis.strip() or ("provided_client_consent" if consent_confirmed else "")
     client_config = load_client_config(client)
     list_id = list_id or client_config.sendy_list_id
+    list_ids = parse_sendy_list_ids(list_id)
+    list_id = ",".join(list_ids)
     brand_id = brand_id or client_config.sendy_brand_id
     from_name = from_name or client_config.from_name or env("SENDY_DEFAULT_FROM_NAME", "Helium")
     from_email = from_email or client_config.from_email or env("SENDY_DEFAULT_FROM_EMAIL", "hello@helium.sg")
@@ -760,8 +766,8 @@ def process_campaign(
 
     if not dry_run and (import_to_sendy or create_campaign) and not consent_confirmed:
         raise ValueError("Confirm that the uploaded list has provided consent before live Sendy actions.")
-    if import_to_sendy and not list_id:
-        raise ValueError("Sendy list ID is required for contact upload.")
+    if import_to_sendy and not list_ids:
+        raise ValueError("At least one Sendy list is required for contact upload.")
     if create_campaign and not brand_id and not send_campaign:
         raise ValueError("Sendy brand ID is required to create a draft campaign.")
 
@@ -798,9 +804,10 @@ def process_campaign(
 
     sendy_results: list[dict[str, str]] = []
     if import_to_sendy:
-        for contact in accepted:
-            result = sendy.subscribe(list_id, contact)
-            sendy_results.append({"email": contact.email, "result": result})
+        for selected_list_id in list_ids:
+            for contact in accepted:
+                result = sendy.subscribe(selected_list_id, contact)
+                sendy_results.append({"email": contact.email, "list_id": selected_list_id, "result": result})
 
     campaign_result = "skipped"
     if create_campaign:
@@ -849,6 +856,7 @@ def process_campaign(
         "rendered_html": str(rendered_html_path),
         "campaign_result": campaign_result,
         "sendy_list_id": list_id,
+        "sendy_list_ids": list_ids,
         "sendy_brand_id": brand_id,
         "from_name": from_name,
         "from_email": from_email,
@@ -858,6 +866,7 @@ def process_campaign(
         "suppression_file": str(suppression_path) if suppression_path else "",
         "output_dir": str(output_dir),
         "sendy_imported": len(sendy_results),
+        "sendy_imported_contacts": len(accepted) if sendy_results else 0,
     }
 
 
@@ -877,7 +886,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--consent-basis", default="", help="Audit note for why this list is permissioned.")
     parser.add_argument("--confirm-consent", action="store_true", help="Confirm uploaded list has provided consent. Required for live Sendy actions.")
     parser.add_argument("--suppression-list", type=Path, help="CSV or JSON suppression list. Suppressed accepted contacts are not uploaded.")
-    parser.add_argument("--list-id", default="", help="Sendy list ID to import/send to. Defaults from client config when available.")
+    parser.add_argument("--list-id", default="", help="Sendy list ID(s) to import/send to. Use a comma-separated value for multiple lists. Defaults from client config when available.")
     parser.add_argument("--brand-id", default="", help="Sendy brand ID for draft creation.")
     parser.add_argument("--from-name", default="", help="Override sender name.")
     parser.add_argument("--from-email", default="", help="Override sender email.")
