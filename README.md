@@ -247,6 +247,16 @@ https://github.com/xyufeng/helium-edm-ops/issues
 
 Use Issues to track new features, safety improvements, Sendy/EmailListVerify integration work, dashboard polish, and bugs found during live testing.
 
+## Tests
+
+Run the smoke test suite:
+
+```bash
+pytest
+```
+
+The dashboard smoke test covers password login, sample file upload, dry-run processing, suppression handling, and generated artifacts.
+
 ## Sources
 
 - Sendy API: https://sendy.co/api
