@@ -1,0 +1,18 @@
+[project]
+name = "helium-edm-ops"
+version = "0.1.0"
+description = "CLI automation for Helium.sg EDM list cleaning, verification, and Sendy campaign setup."
+requires-python = ">=3.10"
+dependencies = [
+  "flask>=3.0.0",
+  "openai>=1.0.0",
+  "requests>=2.31.0",
+]
+
+[project.scripts]
+helium-edm = "helium_edm.cli:main"
+helium-edm-dashboard = "helium_edm.dashboard:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

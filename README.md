@@ -1,0 +1,189 @@
+# Helium EDM Ops
+
+This is a small CLI automation for the real Helium.sg workflow:
+
+1. Receive a client email list and EDM HTML.
+2. Classify uploaded files and plan what to do with each file.
+3. Add the correct client-specific header and footer to the EDM.
+4. Normalize, dedupe, and validate contacts.
+5. Verify emails with EmailListVerify.
+6. Generate an AI preflight: subject suggestion, risks, fixes, and plain-text fallback.
+7. Import clean contacts into Sendy.
+8. Create, schedule, or send the Sendy campaign.
+
+## Why this works for the Stripe take-home
+
+The workflow is real and recurring: each client campaign requires list cleanup, manual upload to EmailListVerify, manual download, manual Sendy import, HTML/plain-text preparation, and campaign creation. The tool compresses that into one command with an auditable run report.
+
+After expert review, the recommended positioning is: **Helium EDM Intake Agent turns a messy client handoff into a verified, client-branded, Sendy-ready campaign draft with an auditable processing plan.**
+
+## Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+cp .env.example .env
+```
+
+Fill in `.env` with your Sendy, EmailListVerify, dashboard password, and optional OpenAI keys.
+
+For Helium, Sendy's API docs are generated with `app_path=https://helium.sg`, so `SENDY_BASE_URL` should be:
+
+```text
+https://helium.sg
+```
+
+## Dashboard
+
+Start the password-protected dashboard:
+
+```bash
+helium-edm-dashboard
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5001
+```
+
+The dashboard lets the operator:
+
+- Sign in with `DASHBOARD_PASSWORD`
+- Choose a Helium client
+- Upload the EDM HTML and contact list CSV
+- See EmailListVerify and Sendy configuration status
+- Fetch Sendy brand discovery when the Sendy API key is configured
+- Run the verification/list hygiene workflow
+- Upload accepted contacts into Sendy
+- Create a Sendy draft campaign
+- Open the generated report, rendered EDM, verified CSV, and JSON audit trail
+
+Dry run is checked by default so the operator can inspect the plan and artifacts before touching live APIs.
+
+## Agent-style demo without API keys
+
+Drop mixed files into an intake folder, then let the agent classify and process them:
+
+```bash
+helium-edm \
+  --input-dir samples/intake \
+  --client export-partner \
+  --list-id demo_list_id \
+  --brand-id demo_brand_id \
+  --import-to-sendy \
+  --create-campaign \
+  --dry-run
+```
+
+The agent will:
+
+- Identify the CSV contact list
+- Identify the EDM HTML
+- Read the subject from campaign notes
+- Apply `templates/clients/export-partner/header.html` and `templates/clients/export-partner/footer.html`
+- Write `runs/latest/rendered_edm.html`
+- Verify/import the accepted contacts
+- Create a Sendy draft payload
+
+## Explicit-file demo without API keys
+
+```bash
+helium-edm \
+  --contacts samples/client_list.csv \
+  --html samples/client_edm.html \
+  --client export-partner \
+  --subject "Private briefing for export growth teams" \
+  --client-note "Client is targeting overseas-facing Chinese exporters." \
+  --list-id demo_list_id \
+  --brand-id demo_brand_id \
+  --import-to-sendy \
+  --create-campaign \
+  --dry-run
+```
+
+Outputs:
+
+- `runs/latest/verified_contacts.csv`
+- `runs/latest/run_report.json`
+- `runs/latest/rendered_edm.html`
+
+## Real Sendy draft
+
+```bash
+helium-edm \
+  --input-dir client_uploads \
+  --client CLIENT_SLUG \
+  --list-id YOUR_SENDY_LIST_ID \
+  --brand-id YOUR_SENDY_BRAND_ID \
+  --import-to-sendy \
+  --create-campaign
+```
+
+## Real scheduled send
+
+```bash
+helium-edm \
+  --input-dir client_uploads \
+  --client CLIENT_SLUG \
+  --list-id YOUR_SENDY_LIST_ID \
+  --import-to-sendy \
+  --create-campaign \
+  --send-campaign \
+  --schedule-date-time "May 15, 2026 10:00am" \
+  --schedule-timezone "Asia/Singapore"
+```
+
+## Prompt used by the AI preflight
+
+```text
+You are helping Helium.sg prepare an EDM campaign received from a client.
+Return strict JSON with:
+- suggested_subject: one concise subject line
+- risk_flags: array of deliverability/compliance/content risks
+- fixes: array of concrete edits to make before sending
+- plain_text_summary: 4-6 sentence plain-text fallback summary
+
+Client note:
+{client_note}
+
+Current subject:
+{subject}
+
+HTML:
+{html}
+```
+
+## Demo story
+
+The first naive version was "summarize this EDM and clean this list." It was too vague: it produced generic marketing copy but did not tell me whether the campaign was ready to send. The better version treats the AI as a preflight reviewer inside a deterministic pipeline: first the code dedupes and verifies emails, then AI reviews only the campaign content and returns structured JSON that the CLI can store in the run report.
+
+## Client templates
+
+Each Helium client can have their own wrapper:
+
+```text
+templates/clients/<client-slug>/header.html
+templates/clients/<client-slug>/footer.html
+```
+
+Use `--client <client-slug>` to select the wrapper. Uploaded `header.html` or `footer.html` files in the intake folder still override the saved client templates for one-off campaigns.
+
+## Expert review
+
+See `EXPERT_REVIEW.md` for the critical thinking, design thinking, email operations, and UI/UX review. The main recommendations are:
+
+- Frame this as opted-in EDM operations and list hygiene, not bulk outbound automation.
+- Keep Sendy draft creation as the default safety boundary.
+- Make the processing plan and audit artifacts visible in the demo.
+- Add consent basis, suppression-list handling, client config, and a human-readable run report as next improvements.
+
+## Sources
+
+- Sendy API: https://sendy.co/api
+- Helium Sendy API path: https://sendy.co/api?app_path=https://helium.sg
+- Sendy third-party resources and integrations: https://sendy.co/api#third-party-resources-integrations
+- EmailListVerify API docs: https://api.emaillistverify.com/api-doc
+- EmailListVerify API: https://emaillistverify.com/api
+- EmailListVerify bulk API flow via official PHP repo: https://github.com/EmailListVerify-com/Emaillistverify-Php

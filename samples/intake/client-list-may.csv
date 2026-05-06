@@ -1,0 +1,6 @@
+name,email,company
+Li Wei,li.wei@example.com,Example China Co
+Chen Mei,chen.mei@example.com,Example China Co
+Duplicate Person,li.wei@example.com,Example China Co
+Bad Address,not-an-email,Example China Co
+Test Invalid,bounce@example.invalid,Example China Co
