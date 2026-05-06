@@ -926,7 +926,14 @@ DASHBOARD_TEMPLATE = """
             </label>
           </div>
           <label>Campaign notes
-            <textarea name="notes" rows="5" placeholder="Client instructions, subject ideas, target audience, campaign period, or special handling notes"></textarea>
+            <textarea name="notes" rows="6" placeholder="Paste the client's campaign instructions here.
+
+Example:
+Subject: Invitation to the May buyer briefing
+Audience: Consented Singapore importers and distributors
+Use lists: Main recipients + event follow-up
+Special handling: Exclude previous unsubscribes. Create draft only.
+Invoice period: May 2026"></textarea>
           </label>
           <label>Suppression list
             <input name="suppression" type="file" accept=".csv,.json">
