@@ -382,10 +382,7 @@ class SendyClient:
 
     def get_brands(self) -> Any:
         result = self.post("/api/brands/get-brands.php", {"api_key": self.api_key})
-        try:
-            return json.loads(result)
-        except json.JSONDecodeError:
-            return result
+        return parse_sendy_json(result)
 
     def get_lists(self, brand_id: str, include_hidden: bool = False) -> Any:
         result = self.post(
@@ -396,10 +393,7 @@ class SendyClient:
                 "include_hidden": "yes" if include_hidden else "no",
             },
         )
-        try:
-            return json.loads(result)
-        except json.JSONDecodeError:
-            return result
+        return parse_sendy_json(result)
 
     def create_campaign(
         self,
@@ -445,6 +439,15 @@ def redact(payload: dict[str, Any]) -> dict[str, Any]:
     if "api_key" in redacted:
         redacted["api_key"] = "***"
     return redacted
+
+
+def parse_sendy_json(value: str) -> Any:
+    if value.lower().startswith("error:"):
+        raise ValueError(value)
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Unexpected Sendy response: {value}") from exc
 
 
 def ai_preflight(html_text: str, plain_text: str, subject: str, client_note: str) -> dict[str, Any]:

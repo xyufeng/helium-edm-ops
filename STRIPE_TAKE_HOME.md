@@ -256,7 +256,7 @@ The dashboard demo is:
 helium-edm-dashboard
 ```
 
-Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `export-partner`, upload the sample CSV and HTML, leave dry run enabled, and process the campaign. The dashboard shows whether EmailListVerify and Sendy are configured, then links to the generated run report, rendered EDM, verified CSV, and JSON audit trail.
+Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `export-partner`, upload the sample CSV and HTML, leave dry run enabled, and process the campaign. When Sendy is configured, the dashboard can load Sendy brands and lists, then auto-fill the selected brand ID and list ID. The dashboard also shows whether EmailListVerify and Sendy are configured, then links to the generated run report, rendered EDM, verified CSV, and JSON audit trail.
 
 Example output summary:
 

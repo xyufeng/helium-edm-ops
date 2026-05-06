@@ -54,7 +54,8 @@ The dashboard lets the operator:
 - Choose a Helium client
 - Upload the EDM HTML and contact list CSV
 - See EmailListVerify and Sendy configuration status
-- Fetch Sendy brand discovery when the Sendy API key is configured
+- Fetch Sendy brands and lists when the Sendy API key is configured
+- Auto-fill Sendy brand ID and list ID from discovery
 - Run the verification/list hygiene workflow
 - Upload accepted contacts into Sendy
 - Create a Sendy draft campaign

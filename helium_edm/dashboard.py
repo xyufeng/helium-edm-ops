@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, flash, redirect, render_template_string, request, send_from_directory, session, url_for
+from flask import Flask, Response, flash, jsonify, redirect, render_template_string, request, send_from_directory, session, url_for
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
@@ -69,9 +69,25 @@ def create_app() -> Flask:
             BASE_CSS=BASE_CSS,
             clients=list_clients(),
             status=service_status(),
-            sendy_discovery=sendy_discovery(),
             latest=latest,
         )
+
+    @app.get("/sendy/brands")
+    def sendy_brands() -> Response:
+        try:
+            return jsonify({"ok": True, "brands": get_sendy_brands()})
+        except Exception as exc:
+            return jsonify({"ok": False, "error": safe_error(exc)}), 400
+
+    @app.get("/sendy/lists")
+    def sendy_lists() -> Response:
+        brand_id = request.args.get("brand_id", "").strip()
+        if not brand_id:
+            return jsonify({"ok": False, "error": "Choose a Sendy brand first."}), 400
+        try:
+            return jsonify({"ok": True, "lists": get_sendy_lists(brand_id)})
+        except Exception as exc:
+            return jsonify({"ok": False, "error": safe_error(exc)}), 400
 
     @app.post("/run")
     def run_campaign() -> Response:
@@ -154,14 +170,24 @@ def service_status() -> dict[str, dict[str, str]]:
     }
 
 
-def sendy_discovery() -> dict[str, Any]:
+def get_sendy_brands() -> Any:
     if not env("SENDY_BASE_URL") or not env("SENDY_API_KEY"):
-        return {"enabled": False, "brands": None, "error": "Sendy is not configured."}
-    try:
-        brands = SendyClient(env("SENDY_BASE_URL"), env("SENDY_API_KEY"), dry_run=False).get_brands()
-        return {"enabled": True, "brands": brands, "error": ""}
-    except Exception as exc:
-        return {"enabled": True, "brands": None, "error": str(exc)}
+        raise ValueError("Sendy is not configured. Set SENDY_BASE_URL and SENDY_API_KEY.")
+    return SendyClient(env("SENDY_BASE_URL"), env("SENDY_API_KEY"), dry_run=False).get_brands()
+
+
+def get_sendy_lists(brand_id: str) -> Any:
+    if not env("SENDY_BASE_URL") or not env("SENDY_API_KEY"):
+        raise ValueError("Sendy is not configured. Set SENDY_BASE_URL and SENDY_API_KEY.")
+    return SendyClient(env("SENDY_BASE_URL"), env("SENDY_API_KEY"), dry_run=False).get_lists(brand_id)
+
+
+def safe_error(exc: Exception) -> str:
+    message = str(exc)
+    for secret in (env("SENDY_API_KEY"), env("EMAILLISTVERIFY_API_KEY"), env("OPENAI_API_KEY")):
+        if secret:
+            message = message.replace(secret, "***")
+    return message
 
 
 def save_upload(file: FileStorage | None, input_dir: Path, label: str) -> Path:
@@ -291,16 +317,6 @@ DASHBOARD_TEMPLATE = """
 
       <section class="panel">
         <h2>New Campaign</h2>
-        {% if sendy_discovery.enabled %}
-          <div class="notice">
-            <strong>Sendy discovery</strong>
-            {% if sendy_discovery.error %}
-              <p>{{ sendy_discovery.error }}</p>
-            {% else %}
-              <pre>{{ sendy_discovery.brands }}</pre>
-            {% endif %}
-          </div>
-        {% endif %}
         <form class="campaign-form" action="{{ url_for('run_campaign') }}" method="post" enctype="multipart/form-data">
           <div class="grid-two">
             <label>Client
@@ -314,12 +330,33 @@ DASHBOARD_TEMPLATE = """
               <input name="subject" placeholder="Optional if notes or H1 contains a subject">
             </label>
           </div>
+          <div class="notice">
+            <strong>Sendy discovery</strong>
+            <p>Load brands and lists from the configured Sendy API, then the dashboard will fill the IDs below.</p>
+            <div class="grid-two">
+              <label>Sendy brand
+                <select id="sendy-brand-select">
+                  <option value="">Load brands to choose</option>
+                </select>
+              </label>
+              <label>Sendy list
+                <select id="sendy-list-select">
+                  <option value="">Choose a brand first</option>
+                </select>
+              </label>
+            </div>
+            <div class="links">
+              <button class="secondary" id="load-brands" type="button">Load Sendy brands</button>
+              <button class="secondary" id="load-lists" type="button">Load lists for brand</button>
+            </div>
+            <p id="sendy-discovery-status" class="muted"></p>
+          </div>
           <div class="grid-two">
             <label>Sendy list ID
-              <input name="list_id" required placeholder="Sendy recipient list ID">
+              <input id="list-id-input" name="list_id" required placeholder="Sendy recipient list ID">
             </label>
             <label>Sendy brand ID
-              <input name="brand_id" placeholder="Required for draft creation">
+              <input id="brand-id-input" name="brand_id" placeholder="Required for draft creation">
             </label>
           </div>
           <div class="grid-two">
@@ -363,6 +400,88 @@ DASHBOARD_TEMPLATE = """
         </section>
       {% endif %}
     </main>
+    <script>
+      const brandSelect = document.getElementById('sendy-brand-select');
+      const listSelect = document.getElementById('sendy-list-select');
+      const brandInput = document.getElementById('brand-id-input');
+      const listInput = document.getElementById('list-id-input');
+      const statusEl = document.getElementById('sendy-discovery-status');
+
+      function normalizeRows(value) {
+        if (Array.isArray(value)) return value;
+        if (value && Array.isArray(value.brands)) return value.brands;
+        if (value && Array.isArray(value.lists)) return value.lists;
+        return [];
+      }
+
+      function rowId(row) {
+        return row.id || row.ID || row.brand_id || row.list_id || row.BrandID || row.ListID || '';
+      }
+
+      function rowName(row) {
+        return row.name || row.Name || row.brand_name || row.list_name || row.title || rowId(row);
+      }
+
+      function fillSelect(select, rows, placeholder) {
+        select.innerHTML = '';
+        const first = document.createElement('option');
+        first.value = '';
+        first.textContent = placeholder;
+        select.appendChild(first);
+        rows.forEach((row) => {
+          const id = rowId(row);
+          if (!id) return;
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = `${rowName(row)} (${id})`;
+          select.appendChild(option);
+        });
+      }
+
+      async function fetchJson(url) {
+        const response = await fetch(url);
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || 'Sendy request failed.');
+        return payload;
+      }
+
+      document.getElementById('load-brands').addEventListener('click', async () => {
+        statusEl.textContent = 'Loading Sendy brands...';
+        try {
+          const payload = await fetchJson('{{ url_for("sendy_brands") }}');
+          fillSelect(brandSelect, normalizeRows(payload.brands), 'Choose a brand');
+          statusEl.textContent = 'Brands loaded.';
+        } catch (error) {
+          statusEl.textContent = error.message;
+        }
+      });
+
+      document.getElementById('load-lists').addEventListener('click', async () => {
+        const brandId = brandSelect.value || brandInput.value;
+        if (!brandId) {
+          statusEl.textContent = 'Choose or enter a Sendy brand ID first.';
+          return;
+        }
+        brandInput.value = brandId;
+        statusEl.textContent = 'Loading Sendy lists...';
+        try {
+          const payload = await fetchJson(`{{ url_for("sendy_lists") }}?brand_id=${encodeURIComponent(brandId)}`);
+          fillSelect(listSelect, normalizeRows(payload.lists), 'Choose a list');
+          statusEl.textContent = 'Lists loaded.';
+        } catch (error) {
+          statusEl.textContent = error.message;
+        }
+      });
+
+      brandSelect.addEventListener('change', () => {
+        brandInput.value = brandSelect.value;
+        listSelect.innerHTML = '<option value="">Load lists for this brand</option>';
+      });
+
+      listSelect.addEventListener('change', () => {
+        listInput.value = listSelect.value;
+      });
+    </script>
   </body>
 </html>
 """
@@ -451,6 +570,7 @@ button.secondary { background: #eef2f6; color: #263241; }
 .alert { background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; padding: 12px 14px; border-radius: 6px; margin-bottom: 18px; }
 .notice { border: 1px solid #c7d2fe; background: #eef2ff; color: #263241; border-radius: 8px; padding: 12px 14px; margin-bottom: 18px; }
 .notice p { margin: 6px 0 0; }
+.muted { color: #5d6b7a; font-size: 13px; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; border-bottom: 1px solid #e6ebf1; padding: 10px; vertical-align: top; }
 pre { white-space: pre-wrap; word-break: break-word; background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 8px; overflow: auto; }
