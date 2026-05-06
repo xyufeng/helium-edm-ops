@@ -53,7 +53,6 @@ aws elasticbeanstalk create-application-version \
 ENV_STATUS="$(aws elasticbeanstalk describe-environments \
   --application-name "$APP_NAME" \
   --environment-names "$ENV_NAME" \
-  --include-deleted false \
   --region "$REGION" \
   --query "Environments[0].Status" \
   --output text 2>/dev/null || true)"
