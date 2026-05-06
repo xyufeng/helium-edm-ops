@@ -37,7 +37,7 @@ def create_app() -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = int(env("MAX_UPLOAD_MB", "25")) * 1024 * 1024
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    app.config["SESSION_COOKIE_SECURE"] = env("DASHBOARD_COOKIE_SECURE", "").lower() == "true" or env("HELIUM_ENV") == "production"
+    app.config["SESSION_COOKIE_SECURE"] = env("DASHBOARD_COOKIE_SECURE", "").lower() == "true"
     validate_dashboard_config()
 
     @app.before_request
