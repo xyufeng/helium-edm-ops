@@ -17,6 +17,7 @@ from helium_edm.cli import (
     build_intake_plan,
     env,
     load_dotenv,
+    load_client_config,
     process_campaign,
     resolve_client_templates,
     SendyClient,
@@ -96,17 +97,15 @@ def create_app() -> Flask:
             subject = request.form.get("subject", "").strip()
             list_id = request.form.get("list_id", "").strip()
             brand_id = request.form.get("brand_id", "").strip()
+            from_name = request.form.get("from_name", "").strip()
+            from_email = request.form.get("from_email", "").strip()
+            reply_to = request.form.get("reply_to", "").strip()
             client_note = request.form.get("client_note", "").strip()
             consent_basis = request.form.get("consent_basis", "").strip()
             consent_confirmed = request.form.get("consent_confirmed") == "on"
             dry_run = request.form.get("dry_run") == "on"
             import_to_sendy = request.form.get("import_to_sendy") == "on"
             create_campaign = request.form.get("create_campaign") == "on"
-
-            if not list_id:
-                raise ValueError("Sendy list ID is required.")
-            if create_campaign and not brand_id:
-                raise ValueError("Sendy brand ID is required to create a draft campaign.")
 
             run_id = time.strftime("%Y%m%d-%H%M%S")
             output_dir = Path("runs") / run_id
@@ -130,6 +129,9 @@ def create_app() -> Flask:
                 list_id=list_id,
                 brand_id=brand_id,
                 output_dir=output_dir,
+                from_name=from_name,
+                from_email=from_email,
+                reply_to=reply_to,
                 client_note=client_note,
                 consent_basis=consent_basis,
                 consent_confirmed=consent_confirmed,
@@ -149,6 +151,22 @@ def create_app() -> Flask:
     @app.get("/runs/<path:filename>")
     def static_run_file(filename: str) -> Response:
         return send_from_directory(Path("runs").resolve(), filename)
+
+    @app.get("/client-config/<client>")
+    def client_config(client: str) -> Response:
+        config = load_client_config(client)
+        return jsonify(
+            {
+                "ok": True,
+                "config": {
+                    "sendy_brand_id": config.sendy_brand_id,
+                    "sendy_list_id": config.sendy_list_id,
+                    "from_name": config.from_name,
+                    "from_email": config.from_email,
+                    "reply_to": config.reply_to,
+                },
+            }
+        )
 
     return app
 
@@ -324,7 +342,7 @@ DASHBOARD_TEMPLATE = """
         <form class="campaign-form" action="{{ url_for('run_campaign') }}" method="post" enctype="multipart/form-data">
           <div class="grid-two">
             <label>Client
-              <select name="client">
+              <select id="client-select" name="client">
                 {% for client in clients %}
                   <option value="{{ client }}">{{ client }}</option>
                 {% endfor %}
@@ -363,6 +381,17 @@ DASHBOARD_TEMPLATE = """
               <input id="brand-id-input" name="brand_id" placeholder="Required for draft creation">
             </label>
           </div>
+          <div class="grid-two">
+            <label>From name
+              <input id="from-name-input" name="from_name" placeholder="Defaults from client config or env">
+            </label>
+            <label>From email
+              <input id="from-email-input" name="from_email" placeholder="Defaults from client config or env">
+            </label>
+          </div>
+          <label>Reply-to email
+            <input id="reply-to-input" name="reply_to" placeholder="Defaults from client config or env">
+          </label>
           <div class="grid-two">
             <label>Contact list CSV
               <input name="contacts" type="file" accept=".csv" required>
@@ -423,8 +452,12 @@ DASHBOARD_TEMPLATE = """
     <script>
       const brandSelect = document.getElementById('sendy-brand-select');
       const listSelect = document.getElementById('sendy-list-select');
+      const clientSelect = document.getElementById('client-select');
       const brandInput = document.getElementById('brand-id-input');
       const listInput = document.getElementById('list-id-input');
+      const fromNameInput = document.getElementById('from-name-input');
+      const fromEmailInput = document.getElementById('from-email-input');
+      const replyToInput = document.getElementById('reply-to-input');
       const statusEl = document.getElementById('sendy-discovery-status');
 
       function normalizeRows(value) {
@@ -501,6 +534,24 @@ DASHBOARD_TEMPLATE = """
       listSelect.addEventListener('change', () => {
         listInput.value = listSelect.value;
       });
+
+      async function loadClientConfig() {
+        try {
+          const payload = await fetchJson(`/client-config/${encodeURIComponent(clientSelect.value)}`);
+          const config = payload.config || {};
+          brandInput.value = config.sendy_brand_id || '';
+          listInput.value = config.sendy_list_id || '';
+          fromNameInput.value = config.from_name || '';
+          fromEmailInput.value = config.from_email || '';
+          replyToInput.value = config.reply_to || '';
+          statusEl.textContent = config.sendy_brand_id || config.sendy_list_id ? 'Client defaults loaded.' : 'No client Sendy defaults configured.';
+        } catch (error) {
+          statusEl.textContent = error.message;
+        }
+      }
+
+      clientSelect.addEventListener('change', loadClientConfig);
+      window.addEventListener('DOMContentLoaded', loadClientConfig);
     </script>
   </body>
 </html>

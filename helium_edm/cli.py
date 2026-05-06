@@ -55,6 +55,19 @@ class IntakePlan:
     actions: list[str]
 
 
+@dataclass(frozen=True)
+class ClientConfig:
+    slug: str
+    sendy_brand_id: str = ""
+    sendy_list_id: str = ""
+    from_name: str = ""
+    from_email: str = ""
+    reply_to: str = ""
+    header_path: str = ""
+    footer_path: str = ""
+    required_footer_text: str = ""
+
+
 def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
 
@@ -164,12 +177,16 @@ def slugify_client(value: str) -> str:
 
 def resolve_client_templates(client: str, header: Path | None, footer: Path | None) -> tuple[Path, Path]:
     client_slug = slugify_client(client)
+    config = load_client_config(client_slug)
     client_dir = Path("templates") / "clients" / client_slug
     client_header = client_dir / "header.html"
     client_footer = client_dir / "footer.html"
 
-    header_path = header or client_header
-    footer_path = footer or client_footer
+    config_header = Path(config.header_path) if config.header_path else None
+    config_footer = Path(config.footer_path) if config.footer_path else None
+
+    header_path = header or config_header or client_header
+    footer_path = footer or config_footer or client_footer
 
     if not header and not client_header.exists():
         header_path = Path("templates/clients/default/header.html")
@@ -177,6 +194,25 @@ def resolve_client_templates(client: str, header: Path | None, footer: Path | No
         footer_path = Path("templates/clients/default/footer.html")
 
     return header_path, footer_path
+
+
+def load_client_config(client: str) -> ClientConfig:
+    client_slug = slugify_client(client)
+    path = Path("config") / "clients" / f"{client_slug}.json"
+    if not path.exists():
+        return ClientConfig(slug=client_slug)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return ClientConfig(
+        slug=client_slug,
+        sendy_brand_id=str(data.get("sendy_brand_id", "")).strip(),
+        sendy_list_id=str(data.get("sendy_list_id", "")).strip(),
+        from_name=str(data.get("from_name", "")).strip(),
+        from_email=str(data.get("from_email", "")).strip(),
+        reply_to=str(data.get("reply_to", "")).strip(),
+        header_path=str(data.get("header_path", "")).strip(),
+        footer_path=str(data.get("footer_path", "")).strip(),
+        required_footer_text=str(data.get("required_footer_text", "")).strip(),
+    )
 
 
 def csv_has_email_column(path: Path) -> tuple[bool, str]:
@@ -563,6 +599,9 @@ def process_campaign(
     list_id: str,
     brand_id: str,
     output_dir: Path,
+    from_name: str = "",
+    from_email: str = "",
+    reply_to: str = "",
     title: str = "",
     client_note: str = "",
     consent_basis: str = "",
@@ -582,9 +621,19 @@ def process_campaign(
 ) -> dict[str, Any]:
     accepted_statuses = accepted_statuses or {"ok"}
     consent_basis = consent_basis.strip() or ("provided_client_consent" if consent_confirmed else "")
+    client_config = load_client_config(client)
+    list_id = list_id or client_config.sendy_list_id
+    brand_id = brand_id or client_config.sendy_brand_id
+    from_name = from_name or client_config.from_name or env("SENDY_DEFAULT_FROM_NAME", "Helium")
+    from_email = from_email or client_config.from_email or env("SENDY_DEFAULT_FROM_EMAIL", "hello@helium.sg")
+    reply_to = reply_to or client_config.reply_to or env("SENDY_DEFAULT_REPLY_TO", "hello@helium.sg")
 
     if not dry_run and (import_to_sendy or create_campaign) and not consent_confirmed:
         raise ValueError("Confirm that the uploaded list has provided consent before live Sendy actions.")
+    if import_to_sendy and not list_id:
+        raise ValueError("Sendy list ID is required for contact upload.")
+    if create_campaign and not brand_id and not send_campaign:
+        raise ValueError("Sendy brand ID is required to create a draft campaign.")
 
     edm_html = html_path.read_text(encoding="utf-8")
     header_html = header_path.read_text(encoding="utf-8") if header_path.exists() else ""
@@ -617,9 +666,9 @@ def process_campaign(
         if not send_campaign and not brand_id:
             raise ValueError("--brand-id is required when creating a Sendy draft.")
         campaign_result = sendy.create_campaign(
-            from_name=env("SENDY_DEFAULT_FROM_NAME", "Helium"),
-            from_email=env("SENDY_DEFAULT_FROM_EMAIL", "hello@helium.sg"),
-            reply_to=env("SENDY_DEFAULT_REPLY_TO", "hello@helium.sg"),
+            from_name=from_name,
+            from_email=from_email,
+            reply_to=reply_to,
             title=title or subject,
             subject=ai_result.get("suggested_subject", subject),
             html_text=html_text,
@@ -656,6 +705,11 @@ def process_campaign(
         "warnings": len(warnings),
         "rendered_html": str(rendered_html_path),
         "campaign_result": campaign_result,
+        "sendy_list_id": list_id,
+        "sendy_brand_id": brand_id,
+        "from_name": from_name,
+        "from_email": from_email,
+        "reply_to": reply_to,
         "consent_basis": consent_basis,
         "consent_confirmed": consent_confirmed,
         "output_dir": str(output_dir),
@@ -678,8 +732,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--client-note", default="", help="Context for AI preflight.")
     parser.add_argument("--consent-basis", default="", help="Audit note for why this list is permissioned.")
     parser.add_argument("--confirm-consent", action="store_true", help="Confirm uploaded list has provided consent. Required for live Sendy actions.")
-    parser.add_argument("--list-id", required=True, help="Sendy list ID to import/send to.")
+    parser.add_argument("--list-id", default="", help="Sendy list ID to import/send to. Defaults from client config when available.")
     parser.add_argument("--brand-id", default="", help="Sendy brand ID for draft creation.")
+    parser.add_argument("--from-name", default="", help="Override sender name.")
+    parser.add_argument("--from-email", default="", help="Override sender email.")
+    parser.add_argument("--reply-to", default="", help="Override reply-to email.")
     parser.add_argument("--email-column", default="email")
     parser.add_argument("--name-column", default="name")
     parser.add_argument("--accepted-status", action="append", default=["ok"], help="Accepted EmailListVerify status. Repeatable.")
@@ -762,6 +819,9 @@ def main(argv: list[str] | None = None) -> int:
         list_id=args.list_id,
         brand_id=args.brand_id,
         output_dir=args.output_dir,
+        from_name=args.from_name,
+        from_email=args.from_email,
+        reply_to=args.reply_to,
         title=args.title,
         client_note=args.client_note,
         consent_basis=args.consent_basis,

@@ -52,6 +52,7 @@ The dashboard lets the operator:
 
 - Sign in with `DASHBOARD_PASSWORD`
 - Choose a Helium client
+- Auto-fill Sendy list, brand, sender, and reply-to fields from client config
 - Upload the EDM HTML and contact list CSV
 - See EmailListVerify and Sendy configuration status
 - Fetch Sendy brands and lists when the Sendy API key is configured
@@ -177,6 +178,27 @@ templates/clients/<client-slug>/footer.html
 ```
 
 Use `--client <client-slug>` to select the wrapper. Uploaded `header.html` or `footer.html` files in the intake folder still override the saved client templates for one-off campaigns.
+
+## Client config
+
+Each Helium client can also have non-secret Sendy defaults:
+
+```text
+config/clients/<client-slug>.json
+```
+
+Supported fields:
+
+- `sendy_brand_id`
+- `sendy_list_id`
+- `from_name`
+- `from_email`
+- `reply_to`
+- `header_path`
+- `footer_path`
+- `required_footer_text`
+
+Do not store API keys in client config. Keep secrets in `.env`.
 
 ## Expert review
 

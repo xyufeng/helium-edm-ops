@@ -88,6 +88,8 @@ The tool is designed to run in `--dry-run` mode for demonstration without real A
 
 I also added a client template layer. Each Helium client can have their own saved header and footer in `templates/clients/<client-slug>/`, so the agent can package the campaign in the correct brand wrapper without rebuilding it each time.
 
+I then added a non-secret client config layer in `config/clients/<client-slug>.json` so the dashboard can default the Sendy brand ID, Sendy list ID, sender name, from email, reply-to, and template paths for each client.
+
 Important safety boundary: this is an opted-in EDM operations and list hygiene tool. EmailListVerify is used to check address quality, not consent. Helium's operating assumption is that uploaded client lists have already provided consent, and the tool records an operator attestation for audit. The default outcome is a Sendy draft for human review, not an automatic blast.
 
 ## Tools Chosen
@@ -150,6 +152,7 @@ The build evolved in a few small steps:
 3. I added EDM rendering so the campaign body is wrapped with a header and footer before Sendy campaign creation.
 4. I then changed the wrapper logic from one global Helium header/footer to per-client templates, because each Helium client needs their own branded header and footer.
 5. I added a password-protected dashboard so the operator can choose a client, upload files, see verification/Sendy service status, run the workflow, and review outputs without using CLI flags directly.
+6. I added per-client Sendy config so choosing a client can auto-fill brand/list/sender defaults while keeping API keys in `.env`.
 
 The current template convention is:
 
@@ -258,6 +261,8 @@ helium-edm-dashboard
 ```
 
 Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `export-partner`, upload the sample CSV and HTML, record the consent attestation, leave dry run enabled, and process the campaign. When Sendy is configured, the dashboard can load Sendy brands and lists, then auto-fill the selected brand ID and list ID. The dashboard also shows whether EmailListVerify and Sendy are configured, then links to the generated run report, rendered EDM, verified CSV, and JSON audit trail.
+
+If a client config exists, selecting the client also auto-fills known brand/list/sender defaults before processing.
 
 Example output summary:
 
@@ -383,6 +388,8 @@ Main files:
 - `EXPERT_REVIEW.md`
 - `.env.example`
 - `helium_edm/dashboard.py`
+- `config/clients/default.json`
+- `config/clients/export-partner.json`
 - `templates/clients/default/header.html`
 - `templates/clients/default/footer.html`
 - `templates/clients/export-partner/header.html`
