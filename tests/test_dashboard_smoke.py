@@ -27,33 +27,32 @@ def test_dashboard_login_upload_and_artifacts(tmp_path, monkeypatch):
 
     with open("samples/intake/client-list-may.csv", "rb") as contacts:
         with open("samples/intake/export-growth-edm.html", "rb") as edm:
-            with open("samples/intake/campaign-notes.txt", "rb") as notes:
-                with open("samples/suppression.csv", "rb") as suppression:
-                    response = client.post(
-                        "/run",
-                        data={
-                            "client": "export-partner",
-                            "consent_basis": "provided_client_consent",
-                            "consent_confirmed": "on",
-                            "dry_run": "on",
-                            "import_to_sendy": "on",
-                            "create_campaign": "on",
-                            "invoice_partner": "Test Partner",
-                            "invoice_currency": "SGD",
-                            "invoice_campaign_fee": "100",
-                            "invoice_verification_unit_fee": "0.01",
-                            "invoice_sending_unit_fee": "0.005",
-                            "invoice_commission_rate": "0.5",
-                            "invoice_discount": "0",
-                            "invoice_period": "May 2026",
-                            "contacts": (contacts, "client-list-may.csv"),
-                            "edm": (edm, "export-growth-edm.html"),
-                            "notes": (notes, "campaign-notes.txt"),
-                            "suppression": (suppression, "suppression.csv"),
-                        },
-                        content_type="multipart/form-data",
-                        follow_redirects=True,
-                    )
+            with open("samples/suppression.csv", "rb") as suppression:
+                response = client.post(
+                    "/run",
+                    data={
+                        "client": "export-partner",
+                        "consent_basis": "provided_client_consent",
+                        "consent_confirmed": "on",
+                        "dry_run": "on",
+                        "import_to_sendy": "on",
+                        "create_campaign": "on",
+                        "invoice_partner": "Test Partner",
+                        "invoice_currency": "SGD",
+                        "invoice_campaign_fee": "100",
+                        "invoice_verification_unit_fee": "0.01",
+                        "invoice_sending_unit_fee": "0.005",
+                        "invoice_commission_rate": "0.5",
+                        "invoice_discount": "0",
+                        "invoice_period": "May 2026",
+                        "contacts": (contacts, "client-list-may.csv"),
+                        "edm": (edm, "export-growth-edm.html"),
+                        "notes": "Subject: Dashboard textarea campaign notes\nAudience: Existing consented sample list",
+                        "suppression": (suppression, "suppression.csv"),
+                    },
+                    content_type="multipart/form-data",
+                    follow_redirects=True,
+                )
 
     assert response.status_code == 200
     assert b"Campaign processed" in response.data
@@ -61,6 +60,7 @@ def test_dashboard_login_upload_and_artifacts(tmp_path, monkeypatch):
     assert Path("runs/latest/run_report.json").exists()
     assert Path("runs/latest/rendered_edm.html").exists()
     assert Path("runs/latest/verified_contacts.csv").exists()
+    assert Path("runs/latest/input/campaign-notes.txt").exists()
     assert Path("runs/latest/invoice.html").exists()
     assert Path("runs/latest/invoice_rows.csv").exists()
     assert Path("runs/latest/invoice.json").exists()
@@ -71,6 +71,9 @@ def test_dashboard_login_upload_and_artifacts(tmp_path, monkeypatch):
     assert "Invoice" in report
     assert "Payable" in report
     assert "Suppressed" in report
+
+    notes_text = Path("runs/latest/input/campaign-notes.txt").read_text(encoding="utf-8")
+    assert "Dashboard textarea campaign notes" in notes_text
 
     csv_text = Path("runs/latest/verified_contacts.csv").read_text(encoding="utf-8")
     assert "suppressed: previous unsubscribe" in csv_text

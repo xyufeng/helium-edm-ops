@@ -115,6 +115,7 @@ def create_app() -> Flask:
             from_name = request.form.get("from_name", "").strip()
             from_email = request.form.get("from_email", "").strip()
             reply_to = request.form.get("reply_to", "").strip()
+            campaign_notes = request.form.get("notes", "").strip()
             client_note = request.form.get("client_note", "").strip()
             consent_basis = request.form.get("consent_basis", "").strip()
             consent_confirmed = request.form.get("consent_confirmed") == "on"
@@ -139,7 +140,7 @@ def create_app() -> Flask:
 
             save_upload(request.files.get("contacts"), input_dir, "contacts")
             save_upload(request.files.get("edm"), input_dir, "edm")
-            save_optional_upload(request.files.get("notes"), input_dir)
+            save_campaign_notes(campaign_notes, input_dir)
             suppression_path = save_optional_upload(request.files.get("suppression"), input_dir)
             if suppression_path == input_dir:
                 suppression_path = None
@@ -297,6 +298,14 @@ def save_optional_upload(file: FileStorage | None, input_dir: Path, required: bo
         raise ValueError(f"Unsupported file extension: {suffix}")
     path = input_dir / filename
     file.save(path)
+    return path
+
+
+def save_campaign_notes(notes: str, input_dir: Path) -> Path | None:
+    if not notes.strip():
+        return None
+    path = input_dir / "campaign-notes.txt"
+    path.write_text(notes.strip() + "\n", encoding="utf-8")
     return path
 
 
@@ -917,7 +926,7 @@ DASHBOARD_TEMPLATE = """
             </label>
           </div>
           <label>Campaign notes
-            <input name="notes" type="file" accept=".txt,.md,.json">
+            <textarea name="notes" rows="5" placeholder="Client instructions, subject ideas, target audience, campaign period, or special handling notes"></textarea>
           </label>
           <label>Suppression list
             <input name="suppression" type="file" accept=".csv,.json">
