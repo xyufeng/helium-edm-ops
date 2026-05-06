@@ -16,6 +16,12 @@ def test_dashboard_login_upload_and_artifacts(tmp_path, monkeypatch):
     assert protected.status_code == 302
     assert protected.location.endswith("/login")
 
+    presentation = client.get("/presentation")
+    assert presentation.status_code == 200
+    assert b"Helium EDM Intake Agent" in presentation.data
+    assert b"speaker-note style narration" not in presentation.data
+    assert b"https://demo.helium.sg/presentation" in presentation.data
+
     login = client.post("/login", data={"password": "test-pass"})
     assert login.status_code == 302
 

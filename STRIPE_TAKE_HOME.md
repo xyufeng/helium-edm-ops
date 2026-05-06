@@ -276,6 +276,12 @@ If a client config exists, selecting the client also auto-fills known brand/list
 
 For deployment, I prepared and launched the project on AWS Elastic Beanstalk with a production WSGI entrypoint, `gunicorn`, a `Procfile`, deployment packaging script, `.ebignore`, and a `/healthz` endpoint for health checks. The running AWS environment is `helium-edm-ops-prod` in `ap-southeast-1`, fronted by CloudFront with ACM SSL at `https://demo.helium.sg`.
 
+I also added an online presentation for the recording. It is a standalone review page with slide text, visual diagrams, and speaker-note style narration for the five- to ten-minute walkthrough:
+
+```text
+https://demo.helium.sg/presentation
+```
+
 Example output summary:
 
 ```json
@@ -420,6 +426,7 @@ Environment: helium-edm-ops-prod
 Uploaded/deployed version: 97f8733-20260506144713
 HTTPS URL: https://demo.helium.sg
 Health check: https://demo.helium.sg/healthz
+Presentation: https://demo.helium.sg/presentation
 CloudFront distribution: E3I851YFE9Y1Y7
 ```
 

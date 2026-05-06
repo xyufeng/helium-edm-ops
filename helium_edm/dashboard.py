@@ -42,7 +42,7 @@ def create_app() -> Flask:
 
     @app.before_request
     def require_login() -> Response | None:
-        if request.endpoint in {"login", "login_post", "healthz"}:
+        if request.endpoint in {"login", "login_post", "healthz", "presentation"}:
             return None
         if session.get("authenticated"):
             return None
@@ -51,6 +51,10 @@ def create_app() -> Flask:
     @app.get("/healthz")
     def healthz() -> Response:
         return jsonify({"ok": True})
+
+    @app.get("/presentation")
+    def presentation() -> str:
+        return render_template_string(PRESENTATION_TEMPLATE, title=f"{APP_TITLE} Presentation")
 
     @app.get("/login")
     def login() -> str:
@@ -369,6 +373,462 @@ LOGIN_TEMPLATE = """
         <button type="submit">Sign in</button>
       </form>
     </main>
+  </body>
+</html>
+"""
+
+PRESENTATION_TEMPLATE = """
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }}</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, Arial, sans-serif;
+        color: #102033;
+        background: #eef2f5;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; }
+      .deck-nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: center;
+        padding: 12px 24px;
+        background: rgba(255,255,255,.92);
+        border-bottom: 1px solid #d7e0ea;
+        backdrop-filter: blur(10px);
+      }
+      .deck-nav strong { font-size: 14px; }
+      .deck-nav a {
+        color: #1455d9;
+        text-decoration: none;
+        font-weight: 750;
+        font-size: 13px;
+      }
+      .nav-links { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
+      .slide {
+        min-height: calc(100vh - 48px);
+        display: grid;
+        grid-template-columns: minmax(0, 1.04fr) minmax(320px, .96fr);
+        gap: 34px;
+        align-items: center;
+        padding: 48px clamp(22px, 6vw, 82px);
+        border-bottom: 1px solid #d9e2ec;
+        background: #fbfcfd;
+      }
+      .slide:nth-of-type(even) { background: #f4f8fb; }
+      .intro { color: #617085; font-size: 15px; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 12px; }
+      h1, h2, p { margin-top: 0; }
+      h1 { font-size: clamp(44px, 6vw, 82px); line-height: .94; margin-bottom: 24px; letter-spacing: 0; }
+      h2 { font-size: clamp(32px, 4vw, 56px); line-height: 1; margin-bottom: 20px; letter-spacing: 0; }
+      p { color: #43566d; font-size: 20px; line-height: 1.48; }
+      .bullets { display: grid; gap: 12px; margin: 24px 0; padding: 0; list-style: none; }
+      .bullets li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        color: #24364d;
+        font-size: 18px;
+        line-height: 1.42;
+      }
+      .bullets li::before {
+        content: "";
+        flex: 0 0 8px;
+        width: 8px;
+        height: 8px;
+        margin-top: 9px;
+        border-radius: 50%;
+        background: #14a38b;
+      }
+      .visual {
+        min-height: 440px;
+        border: 1px solid #d5dee8;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 20px 45px rgba(34,49,72,.10);
+        padding: 24px;
+        display: grid;
+        align-items: center;
+      }
+      .notes {
+        margin-top: 28px;
+        border-left: 4px solid #1455d9;
+        padding: 14px 18px;
+        background: #edf4ff;
+        color: #20364f;
+        font-size: 17px;
+        line-height: 1.5;
+      }
+      .prompt {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        white-space: pre-wrap;
+        color: #d9e8ff;
+        background: #102033;
+        border-radius: 8px;
+        padding: 18px;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+      .metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .metric {
+        border: 1px solid #dce5ee;
+        border-radius: 8px;
+        padding: 16px;
+        background: #f8fbfd;
+      }
+      .metric strong { display: block; color: #0f2948; font-size: 28px; margin-bottom: 5px; }
+      .metric span { color: #617085; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+      .browser {
+        border: 1px solid #cad6e2;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+      }
+      .browser-bar {
+        height: 36px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        background: #e7edf4;
+      }
+      .dot { width: 10px; height: 10px; border-radius: 50%; background: #ef6a5b; }
+      .dot:nth-child(2) { background: #f4bd4f; }
+      .dot:nth-child(3) { background: #61c454; }
+      .screen { padding: 18px; display: grid; gap: 14px; }
+      .field { border: 1px solid #d8e1eb; border-radius: 6px; padding: 12px; color: #263b52; background: #fbfcfe; }
+      .button-row { display: flex; gap: 10px; flex-wrap: wrap; }
+      .button-chip { border-radius: 6px; padding: 10px 12px; background: #1455d9; color: #fff; font-weight: 750; }
+      .button-chip.secondary { background: #e8edf3; color: #263b52; }
+      svg { width: 100%; height: auto; display: block; }
+      .link-list { display: grid; gap: 10px; margin-top: 20px; }
+      .link-list a { color: #1455d9; font-size: 19px; font-weight: 750; text-decoration: none; }
+      @media (max-width: 920px) {
+        .slide { grid-template-columns: 1fr; padding-top: 34px; }
+        .visual { min-height: 320px; }
+        h1 { font-size: 46px; }
+        h2 { font-size: 36px; }
+      }
+      @media print {
+        .deck-nav { display: none; }
+        .slide { min-height: auto; break-after: page; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="deck-nav">
+      <strong>Helium EDM Intake Agent</strong>
+      <div class="nav-links">
+        <a href="#workflow">Workflow</a>
+        <a href="#build">Build</a>
+        <a href="#demo">Demo</a>
+        <a href="#links">Links</a>
+      </div>
+    </nav>
+
+    <section class="slide" id="title">
+      <div>
+        <div class="intro">Stripe Forward Deployed AI Accelerator take-home</div>
+        <h1>Helium EDM Intake Agent</h1>
+        <p>From messy client handoff to a verified, branded Sendy campaign draft on helium.sg.</p>
+        <div class="notes">Narration: I run a side business called helium.sg. A partner in China regularly sends me email lists and EDM creative, and needs a dependable way to send campaigns outside China. I built an AI-assisted operator tool around the real workflow I already do.</div>
+      </div>
+      <div class="visual">
+        <svg viewBox="0 0 760 520" role="img" aria-label="Campaign intake transformed into a ready Sendy campaign">
+          <rect x="34" y="74" width="230" height="118" rx="8" fill="#eef5ff" stroke="#9bb7e8"/>
+          <text x="62" y="116" font-size="26" font-weight="700" fill="#102033">Client handoff</text>
+          <text x="62" y="151" font-size="18" fill="#43566d">CSV + EDM + notes</text>
+          <rect x="34" y="326" width="230" height="118" rx="8" fill="#fff7ed" stroke="#f2c288"/>
+          <text x="62" y="368" font-size="26" font-weight="700" fill="#102033">Manual ops</text>
+          <text x="62" y="403" font-size="18" fill="#43566d">Verify, wrap, upload</text>
+          <path d="M278 132 C374 132 370 260 458 260" fill="none" stroke="#1455d9" stroke-width="8" stroke-linecap="round"/>
+          <path d="M278 384 C374 384 370 260 458 260" fill="none" stroke="#14a38b" stroke-width="8" stroke-linecap="round"/>
+          <circle cx="514" cy="260" r="84" fill="#102033"/>
+          <text x="466" y="252" font-size="24" font-weight="800" fill="#fff">Agent</text>
+          <text x="447" y="285" font-size="17" fill="#cfe7ff">Assess Plan Act</text>
+          <rect x="596" y="74" width="132" height="370" rx="8" fill="#f8fbfd" stroke="#cbd8e4"/>
+          <rect x="619" y="104" width="86" height="54" rx="6" fill="#dff7ef"/>
+          <rect x="619" y="180" width="86" height="54" rx="6" fill="#e8edff"/>
+          <rect x="619" y="256" width="86" height="54" rx="6" fill="#fff1df"/>
+          <rect x="619" y="332" width="86" height="54" rx="6" fill="#edf4ff"/>
+          <text x="620" y="425" font-size="18" font-weight="700" fill="#102033">Sendy draft</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="slide" id="workflow">
+      <div>
+        <div class="intro">Workflow today</div>
+        <h2>Recurring work with too many tiny decisions</h2>
+        <ul class="bullets">
+          <li>Client sends a recipient list and EDM creative for each campaign.</li>
+          <li>I clean the list, verify emails, add the right client header and footer, and prepare Sendy.</li>
+          <li>The painful part is not one hard task. It is repeated judgment, copy-paste, and audit risk.</li>
+        </ul>
+        <div class="notes">Narration: The current workflow happens every time a campaign comes in. I receive files, open the CSV, check columns, run verification, patch the HTML, upload to Sendy, create a campaign, and separately calculate billing. It is slow because each step depends on the previous one being done correctly.</div>
+      </div>
+      <div class="visual">
+        <svg viewBox="0 0 760 520" role="img" aria-label="Current workflow steps">
+          <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#5b6b7c"/></marker></defs>
+          <g font-family="Inter, Arial, sans-serif">
+            <rect x="48" y="54" width="250" height="76" rx="8" fill="#fff" stroke="#cad6e2"/>
+            <text x="72" y="101" font-size="22" font-weight="700" fill="#102033">Receive files</text>
+            <rect x="462" y="54" width="250" height="76" rx="8" fill="#fff" stroke="#cad6e2"/>
+            <text x="486" y="101" font-size="22" font-weight="700" fill="#102033">Guess file roles</text>
+            <rect x="48" y="222" width="250" height="76" rx="8" fill="#fff" stroke="#cad6e2"/>
+            <text x="72" y="269" font-size="22" font-weight="700" fill="#102033">Clean + verify</text>
+            <rect x="462" y="222" width="250" height="76" rx="8" fill="#fff" stroke="#cad6e2"/>
+            <text x="486" y="269" font-size="22" font-weight="700" fill="#102033">Wrap EDM HTML</text>
+            <rect x="48" y="390" width="250" height="76" rx="8" fill="#fff" stroke="#cad6e2"/>
+            <text x="72" y="437" font-size="22" font-weight="700" fill="#102033">Upload lists</text>
+            <rect x="462" y="390" width="250" height="76" rx="8" fill="#fff" stroke="#cad6e2"/>
+            <text x="486" y="437" font-size="22" font-weight="700" fill="#102033">Create draft</text>
+            <path d="M300 92 H458" stroke="#5b6b7c" stroke-width="4" marker-end="url(#arrow)"/>
+            <path d="M587 132 V216" stroke="#5b6b7c" stroke-width="4" marker-end="url(#arrow)"/>
+            <path d="M462 260 H304" stroke="#5b6b7c" stroke-width="4" marker-end="url(#arrow)"/>
+            <path d="M173 300 V384" stroke="#5b6b7c" stroke-width="4" marker-end="url(#arrow)"/>
+            <path d="M300 428 H458" stroke="#5b6b7c" stroke-width="4" marker-end="url(#arrow)"/>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="intro">First principles</div>
+        <h2>The agent has one job: turn ambiguous uploads into a review-ready campaign</h2>
+        <ul class="bullets">
+          <li>Assess what each uploaded file is.</li>
+          <li>Plan the exact processing sequence before acting.</li>
+          <li>Act through APIs and deterministic checks.</li>
+          <li>Leave behind artifacts that make the run auditable.</li>
+        </ul>
+        <div class="notes">Narration: I designed it as an operator workflow, not a chat toy. The tool should inspect the files, decide which is the contact list and which is the EDM, apply the right client defaults, then create a Sendy-ready draft without hiding the decisions it made.</div>
+      </div>
+      <div class="visual">
+        <svg viewBox="0 0 760 520" role="img" aria-label="Assess plan act report loop">
+          <circle cx="380" cy="260" r="154" fill="#f7fbff" stroke="#bfd0e1" stroke-width="3"/>
+          <circle cx="380" cy="92" r="62" fill="#e8f2ff" stroke="#8cafeb"/>
+          <text x="340" y="101" font-size="24" font-weight="800" fill="#102033">Assess</text>
+          <circle cx="548" cy="260" r="62" fill="#e6f8f1" stroke="#87cdb8"/>
+          <text x="516" y="269" font-size="24" font-weight="800" fill="#102033">Plan</text>
+          <circle cx="380" cy="428" r="62" fill="#fff3df" stroke="#e2b36e"/>
+          <text x="354" y="437" font-size="24" font-weight="800" fill="#102033">Act</text>
+          <circle cx="212" cy="260" r="62" fill="#f0edff" stroke="#aaa0e8"/>
+          <text x="176" y="269" font-size="24" font-weight="800" fill="#102033">Report</text>
+          <text x="316" y="252" font-size="24" font-weight="800" fill="#102033">Human</text>
+          <text x="304" y="286" font-size="24" font-weight="800" fill="#102033">reviews</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="slide" id="build">
+      <div>
+        <div class="intro">Building process</div>
+        <h2>I combined narrow AI judgment with boring reliable code</h2>
+        <ul class="bullets">
+          <li>Python CLI for repeatable processing and testing.</li>
+          <li>Flask dashboard for the actual operator workflow.</li>
+          <li>EmailListVerify for list cleaning.</li>
+          <li>Sendy API for brand/list discovery, subscriber import, and campaign draft creation.</li>
+        </ul>
+        <div class="notes">Narration: The build started as a command-line pipeline because that is easier to test. Then I wrapped it in a dashboard because the real workflow starts with files from a client. AI is useful for classification and preflight reasoning, while the API calls and counts need deterministic code.</div>
+      </div>
+      <div class="visual">
+        <div class="prompt">System: You are an EDM operations assistant.
+
+Given uploaded files, classify each file as contacts, EDM HTML, notes, or suppression list.
+Then propose a processing plan.
+
+Rules:
+- Never send without explicit live mode.
+- Use the selected client's header/footer.
+- Treat EmailListVerify unknown/risky statuses as quarantine.
+- Create a Sendy draft for human review.</div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="intro">Debugging moment</div>
+        <h2>The Sendy API returned data that was almost JSON</h2>
+        <ul class="bullets">
+          <li>Brand/list discovery worked in principle, but Sendy's response could include malformed control characters.</li>
+          <li>I added a defensive parser and made the UI show a clear live status.</li>
+          <li>That changed the dashboard from a mock form into a production wiring check.</li>
+        </ul>
+        <div class="notes">Narration: One useful failure was Sendy list discovery. I expected clean JSON. The real response had characters that broke normal parsing, so I added a robust parser and surfaced the error in the UI. That was the point where the demo became connected to the real system.</div>
+      </div>
+      <div class="visual">
+        <div class="browser">
+          <div class="browser-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="screen">
+            <div class="field">Load Sendy brands</div>
+            <div class="field">Brand found: China Security Association</div>
+            <div class="field">Lists found: Main recipients, Event follow-up, Partner list</div>
+            <div class="field">Parser recovery: cleaned response before JSON decode</div>
+            <div class="button-row">
+              <span class="button-chip">Live API mode</span>
+              <span class="button-chip secondary">Draft only</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="demo">
+      <div>
+        <div class="intro">Working demo</div>
+        <h2>The dashboard follows the real campaign run</h2>
+        <ul class="bullets">
+          <li>Choose client and load Sendy brand defaults.</li>
+          <li>Upload EDM HTML, contact list, notes, and optional suppression list.</li>
+          <li>Choose dry-run or live API mode with consent attestation.</li>
+          <li>Generate a report before the campaign is sent.</li>
+        </ul>
+        <div class="notes">Narration: In the demo I show the dashboard at demo.helium.sg. The client selection drives header, footer, sender defaults, Sendy brand, and recipient lists. I can run in dry mode for a safe recording or live mode for a real operational run.</div>
+      </div>
+      <div class="visual">
+        <div class="browser">
+          <div class="browser-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="screen">
+            <div class="field">Client: China Security Association</div>
+            <div class="field">Sendy brand: loaded from API</div>
+            <div class="field">Sendy lists: multiple selected recipient lists</div>
+            <div class="field">Contact list CSV: client-list.csv</div>
+            <div class="field">EDM HTML: campaign.html</div>
+            <div class="button-row">
+              <span class="button-chip secondary">Dry run</span>
+              <span class="button-chip">Process campaign</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="intro">Outputs</div>
+        <h2>Every run creates a traceable review package</h2>
+        <ul class="bullets">
+          <li>Verified contacts CSV with accepted, rejected, quarantined, and suppressed rows.</li>
+          <li>Rendered EDM with the selected client header and footer.</li>
+          <li>Run report JSON plus a human-readable dashboard report.</li>
+          <li>Sendy import and campaign creation results.</li>
+        </ul>
+        <div class="notes">Narration: The output is not just a success message. It produces the campaign HTML, the verified list, the JSON audit trail, and a dashboard report. This matters because campaign ops need evidence, especially when a client asks why a contact was skipped.</div>
+      </div>
+      <div class="visual">
+        <div class="metric-grid">
+          <div class="metric"><strong>accepted</strong><span>Ready contacts</span></div>
+          <div class="metric"><strong>rejected</strong><span>Invalid or failed</span></div>
+          <div class="metric"><strong>quarantine</strong><span>Risky or unknown</span></div>
+          <div class="metric"><strong>suppressed</strong><span>Do-not-email rows</span></div>
+          <div class="metric"><strong>rendered_edm.html</strong><span>Client wrapper applied</span></div>
+          <div class="metric"><strong>run_report.json</strong><span>Audit trail</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="intro">Billing handoff</div>
+        <h2>I folded invoicing into the same run</h2>
+        <ul class="bullets">
+          <li>The run writes tracker-aligned invoice rows.</li>
+          <li>It calculates setup, cleaning, sending, discount, commission, and payable amounts.</li>
+          <li>The output can be pasted into my existing Google Sheet and exported as PDF.</li>
+        </ul>
+        <div class="notes">Narration: As I built the workflow, I realized the operation does not end at Sendy. I also need to invoice my partner. So I used my existing tracker and PDF invoice as examples, then made each campaign run produce invoice rows automatically.</div>
+      </div>
+      <div class="visual">
+        <svg viewBox="0 0 760 520" role="img" aria-label="Invoice tracker table">
+          <rect x="50" y="52" width="660" height="416" rx="8" fill="#fff" stroke="#cbd8e4"/>
+          <rect x="50" y="52" width="660" height="58" rx="8" fill="#eaf2ff"/>
+          <text x="78" y="88" font-size="24" font-weight="800" fill="#102033">Helium Emails</text>
+          <g font-size="17" fill="#263b52">
+            <text x="78" y="154">Invoice ID</text><text x="280" y="154">HE-2026-0001</text>
+            <text x="78" y="204">Setup Cost</text><text x="280" y="204">$120.00</text>
+            <text x="78" y="254">Email Cleaning</text><text x="280" y="254">$48.50</text>
+            <text x="78" y="304">Email Sending</text><text x="280" y="304">$72.75</text>
+            <text x="78" y="354">Commission</text><text x="280" y="354">$120.63</text>
+            <text x="78" y="418" font-weight="800">PAYABLE</text><text x="280" y="418" font-weight="800">$120.62</text>
+          </g>
+          <rect x="496" y="160" width="146" height="186" rx="8" fill="#f3fbf8" stroke="#a6dccb"/>
+          <text x="522" y="232" font-size="20" font-weight="800" fill="#102033">CSV rows</text>
+          <text x="518" y="270" font-size="17" fill="#43566d">to Google</text>
+          <text x="532" y="300" font-size="17" fill="#43566d">Sheets</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="slide">
+      <div>
+        <div class="intro">Production deployment</div>
+        <h2>The tool is live behind HTTPS</h2>
+        <ul class="bullets">
+          <li>Flask app served through gunicorn on AWS Elastic Beanstalk.</li>
+          <li>CloudFront and ACM provide SSL for demo.helium.sg.</li>
+          <li>Operational dashboard is password protected; the presentation is public for review.</li>
+        </ul>
+        <div class="notes">Narration: I deployed it because the task asks for a working tool, not only a local script. The dashboard is live on AWS behind SSL, with secrets stored as environment variables and not in the repository.</div>
+      </div>
+      <div class="visual">
+        <svg viewBox="0 0 760 520" role="img" aria-label="AWS deployment architecture">
+          <rect x="42" y="210" width="160" height="92" rx="8" fill="#edf4ff" stroke="#9bb7e8"/>
+          <text x="76" y="264" font-size="24" font-weight="800" fill="#102033">Browser</text>
+          <rect x="300" y="88" width="170" height="92" rx="8" fill="#fff5e6" stroke="#e3b66e"/>
+          <text x="326" y="143" font-size="24" font-weight="800" fill="#102033">CloudFront</text>
+          <rect x="300" y="336" width="170" height="92" rx="8" fill="#e6f8f1" stroke="#87cdb8"/>
+          <text x="350" y="391" font-size="24" font-weight="800" fill="#102033">ACM</text>
+          <rect x="556" y="210" width="160" height="92" rx="8" fill="#f0edff" stroke="#aaa0e8"/>
+          <text x="588" y="253" font-size="24" font-weight="800" fill="#102033">Elastic</text>
+          <text x="571" y="283" font-size="24" font-weight="800" fill="#102033">Beanstalk</text>
+          <path d="M205 256 H552" stroke="#53657a" stroke-width="5"/>
+          <path d="M385 184 V332" stroke="#53657a" stroke-width="5"/>
+          <text x="270" y="246" font-size="18" fill="#43566d">demo.helium.sg</text>
+          <text x="336" y="264" font-size="18" fill="#43566d">HTTPS</text>
+        </svg>
+      </div>
+    </section>
+
+    <section class="slide" id="links">
+      <div>
+        <div class="intro">Submission links</div>
+        <h2>Working tool, prompts, and presentation</h2>
+        <ul class="bullets">
+          <li>Live presentation: this page.</li>
+          <li>Working dashboard: https://demo.helium.sg</li>
+          <li>Repository and prompts: GitHub README and Stripe take-home document.</li>
+        </ul>
+        <div class="link-list">
+          <a href="https://demo.helium.sg/presentation">https://demo.helium.sg/presentation</a>
+          <a href="https://demo.helium.sg">https://demo.helium.sg</a>
+          <a href="https://github.com/xyufeng/helium-edm-ops">https://github.com/xyufeng/helium-edm-ops</a>
+        </div>
+        <div class="notes">Narration: This closes the loop on the Stripe prompt. The workflow is real, the build process is documented, the prompts are visible in the repo, the demo runs on realistic inputs, and the live tool is available at the deployed URL.</div>
+      </div>
+      <div class="visual">
+        <svg viewBox="0 0 760 520" role="img" aria-label="Submission package">
+          <rect x="92" y="74" width="576" height="372" rx="8" fill="#fff" stroke="#cbd8e4"/>
+          <rect x="130" y="116" width="500" height="70" rx="8" fill="#edf4ff"/>
+          <text x="160" y="160" font-size="25" font-weight="800" fill="#102033">Working demo</text>
+          <rect x="130" y="224" width="500" height="70" rx="8" fill="#e6f8f1"/>
+          <text x="160" y="268" font-size="25" font-weight="800" fill="#102033">Build process + prompts</text>
+          <rect x="130" y="332" width="500" height="70" rx="8" fill="#fff5e6"/>
+          <text x="160" y="376" font-size="25" font-weight="800" fill="#102033">Recorded narration script</text>
+        </svg>
+      </div>
+    </section>
   </body>
 </html>
 """
