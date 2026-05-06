@@ -90,7 +90,7 @@ I also added a client template layer. Each Helium client can have their own save
 
 I then added a non-secret client config layer in `config/clients/<client-slug>.json` so the dashboard can default the Sendy brand, optional Sendy list selection, sender name, from email, reply-to, and template paths for each client.
 
-I later tightened this from sample configuration into live Helium Sendy wiring: the dashboard client dropdown now shows the real Sendy brands configured for Helium, and choosing a client preselects the matching Sendy brand and loads that brand's live Sendy lists. The operator can select multiple lists for the same campaign.
+I later tightened this from sample configuration into live Helium Sendy wiring: the dashboard client dropdown now shows the real Sendy brands configured for Helium, and choosing a client preselects the matching Sendy brand, uses that brand's sender defaults, and loads that brand's live Sendy lists. The operator can select multiple lists for the same campaign.
 
 Important safety boundary: this is an opted-in EDM operations and list hygiene tool. EmailListVerify is used to check address quality, not consent. Helium's operating assumption is that uploaded client lists have already provided consent, and the tool records an operator attestation for audit. The default outcome is a Sendy draft for human review, not an automatic blast.
 

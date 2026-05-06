@@ -52,7 +52,7 @@ The dashboard lets the operator:
 
 - Sign in with `DASHBOARD_PASSWORD`
 - Choose a real Helium Sendy client/brand
-- Auto-fill Sendy brand, sender, and reply-to fields from client config
+- Use brand sender and reply-to defaults from client config
 - Upload the EDM HTML and contact list CSV
 - See EmailListVerify and Sendy configuration status
 - Fetch Sendy brands and lists automatically when the Sendy API key is configured
@@ -237,7 +237,7 @@ Supported fields:
 
 Do not store API keys in client config. Keep secrets in `.env`.
 
-The production dashboard hides sample configs and shows the live Helium Sendy brands configured in `config/clients`: ISLE, CIIE, Test, and China Security Association. Choosing a client preselects its Sendy brand and loads the live list options for that brand.
+The production dashboard hides sample configs and shows the live Helium Sendy brands configured in `config/clients`: ISLE, CIIE, Test, and China Security Association. Choosing a client preselects its Sendy brand, loads the live list options for that brand, and uses the configured brand sender defaults without requiring per-campaign edits.
 
 ## Expert review
 

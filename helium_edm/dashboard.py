@@ -421,17 +421,10 @@ DASHBOARD_TEMPLATE = """
             <p id="sendy-discovery-status" class="muted"></p>
           </div>
           <input id="brand-id-input" name="brand_id" type="hidden">
-          <div class="grid-two">
-            <label>From name
-              <input id="from-name-input" name="from_name" placeholder="Defaults from client config or env">
-            </label>
-            <label>From email
-              <input id="from-email-input" name="from_email" placeholder="Defaults from client config or env">
-            </label>
+          <div class="notice">
+            <strong>Brand sender defaults</strong>
+            <p id="sender-defaults">Loaded from the selected brand config.</p>
           </div>
-          <label>Reply-to email
-            <input id="reply-to-input" name="reply_to" placeholder="Defaults from client config or env">
-          </label>
           <div class="grid-two">
             <label>Contact list CSV
               <input name="contacts" type="file" accept=".csv" required>
@@ -497,9 +490,7 @@ DASHBOARD_TEMPLATE = """
       const listSelect = document.getElementById('sendy-list-select');
       const clientSelect = document.getElementById('client-select');
       const brandInput = document.getElementById('brand-id-input');
-      const fromNameInput = document.getElementById('from-name-input');
-      const fromEmailInput = document.getElementById('from-email-input');
-      const replyToInput = document.getElementById('reply-to-input');
+      const senderDefaults = document.getElementById('sender-defaults');
       const statusEl = document.getElementById('sendy-discovery-status');
 
       function normalizeRows(value) {
@@ -621,9 +612,10 @@ DASHBOARD_TEMPLATE = """
           const payload = await fetchJson(`/client-config/${encodeURIComponent(clientSelect.value)}`);
           const config = payload.config || {};
           brandInput.value = config.sendy_brand_id || '';
-          fromNameInput.value = config.from_name || '';
-          fromEmailInput.value = config.from_email || '';
-          replyToInput.value = config.reply_to || '';
+          const fromName = config.from_name || '(not configured)';
+          const fromEmail = config.from_email || '(not configured)';
+          const replyTo = config.reply_to || '(not configured)';
+          senderDefaults.textContent = `From: ${fromName} <${fromEmail}>. Reply-to: ${replyTo}.`;
           if (!brandsLoaded) await loadBrands(config.sendy_brand_id || '');
           if (config.sendy_brand_id) {
             brandSelect.value = config.sendy_brand_id;
