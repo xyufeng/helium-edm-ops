@@ -242,6 +242,8 @@ Do not store API keys in client config. Keep secrets in `.env`.
 
 The production dashboard hides sample configs and shows the live Helium Sendy brands configured in `config/clients`: ISLE, CIIE, Test, and China Security Association. Choosing a client preselects its Sendy brand, loads the live list options for that brand, and uses the configured brand sender defaults without requiring per-campaign edits.
 
+Invoice artifacts mirror the existing Helium tracker format: invoice ID, date, period, client, setup cost per campaign, sending cost per email, cleaning cost per email, `Setup Cost`, `Email Cleaning`, `Email Sending`, `DISCOUNT`, `Total Cost`, `Commission`, and `PAYABLE`.
+
 ## Expert review
 
 See `EXPERT_REVIEW.md` for the critical thinking, design thinking, email operations, and UI/UX review. The main recommendations are:

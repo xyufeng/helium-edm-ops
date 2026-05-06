@@ -36,7 +36,10 @@ def test_dashboard_login_upload_and_artifacts(tmp_path, monkeypatch):
                             "invoice_currency": "SGD",
                             "invoice_campaign_fee": "100",
                             "invoice_verification_unit_fee": "0.01",
-                            "invoice_list_fee": "5",
+                            "invoice_sending_unit_fee": "0.005",
+                            "invoice_commission_rate": "0.5",
+                            "invoice_discount": "0",
+                            "invoice_period": "May 2026",
                             "contacts": (contacts, "client-list-may.csv"),
                             "edm": (edm, "export-growth-edm.html"),
                             "notes": (notes, "campaign-notes.txt"),
@@ -60,7 +63,14 @@ def test_dashboard_login_upload_and_artifacts(tmp_path, monkeypatch):
     assert "Consent Attestation" in report
     assert "Deliverability Checks" in report
     assert "Invoice" in report
+    assert "Payable" in report
     assert "Suppressed" in report
 
     csv_text = Path("runs/latest/verified_contacts.csv").read_text(encoding="utf-8")
     assert "suppressed: previous unsubscribe" in csv_text
+
+    invoice_text = Path("runs/latest/invoice_rows.csv").read_text(encoding="utf-8")
+    assert "Setup Cost" in invoice_text
+    assert "Email Cleaning" in invoice_text
+    assert "Email Sending" in invoice_text
+    assert "PAYABLE" in invoice_text

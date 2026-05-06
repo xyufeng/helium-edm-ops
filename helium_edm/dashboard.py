@@ -119,6 +119,10 @@ def create_app() -> Flask:
             invoice_campaign_fee = request.form.get("invoice_campaign_fee", "0").strip()
             invoice_verification_unit_fee = request.form.get("invoice_verification_unit_fee", "0").strip()
             invoice_list_fee = request.form.get("invoice_list_fee", "0").strip()
+            invoice_sending_unit_fee = request.form.get("invoice_sending_unit_fee", "0").strip()
+            invoice_commission_rate = request.form.get("invoice_commission_rate", "0.5").strip()
+            invoice_discount = request.form.get("invoice_discount", "0").strip()
+            invoice_period = request.form.get("invoice_period", "").strip()
 
             run_id = time.strftime("%Y%m%d-%H%M%S")
             output_dir = Path("runs") / run_id
@@ -160,6 +164,10 @@ def create_app() -> Flask:
                 invoice_campaign_fee=invoice_campaign_fee,
                 invoice_verification_unit_fee=invoice_verification_unit_fee,
                 invoice_list_fee=invoice_list_fee,
+                invoice_sending_unit_fee=invoice_sending_unit_fee,
+                invoice_commission_rate=invoice_commission_rate,
+                invoice_discount=invoice_discount,
+                invoice_period=invoice_period,
                 plan=plan,
                 assessments=assessments,
             )
@@ -489,14 +497,23 @@ DASHBOARD_TEMPLATE = """
               <label>Currency
                 <input name="invoice_currency" value="SGD">
               </label>
+              <label>Period
+                <input name="invoice_period" placeholder="May 2026">
+              </label>
               <label>Campaign fee
                 <input name="invoice_campaign_fee" inputmode="decimal" placeholder="0.00">
               </label>
               <label>Verification unit fee
                 <input name="invoice_verification_unit_fee" inputmode="decimal" placeholder="0.00">
               </label>
-              <label>Per-list upload fee
-                <input name="invoice_list_fee" inputmode="decimal" placeholder="0.00">
+              <label>Sending unit fee
+                <input name="invoice_sending_unit_fee" inputmode="decimal" placeholder="0.00">
+              </label>
+              <label>Commission rate
+                <input name="invoice_commission_rate" inputmode="decimal" value="0.5">
+              </label>
+              <label>Discount
+                <input name="invoice_discount" inputmode="decimal" placeholder="0.00">
               </label>
             </div>
           </div>
@@ -748,7 +765,10 @@ REPORT_TEMPLATE = """
           <tbody>
             <tr><th>Invoice ID</th><td>{{ summary.invoice_id }}</td></tr>
             <tr><th>Partner</th><td>{{ summary.invoice_partner }}</td></tr>
+            <tr><th>Period</th><td>{{ summary.invoice_period }}</td></tr>
             <tr><th>Total</th><td>{{ summary.invoice_currency }} {{ summary.invoice_total }}</td></tr>
+            <tr><th>Commission</th><td>{{ summary.invoice_currency }} {{ summary.invoice_commission }}</td></tr>
+            <tr><th>Payable</th><td>{{ summary.invoice_currency }} {{ summary.invoice_payable }}</td></tr>
           </tbody>
         </table>
         <div class="links">

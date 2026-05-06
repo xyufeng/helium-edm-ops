@@ -310,8 +310,20 @@ def parse_decimal(value: str | int | float | Decimal) -> Decimal:
         return Decimal("0.00")
 
 
+def parse_rate(value: str | int | float | Decimal) -> Decimal:
+    try:
+        return Decimal(str(value or "0"))
+    except (InvalidOperation, ValueError):
+        return Decimal("0")
+
+
 def format_money(value: Decimal, currency: str) -> str:
     return f"{currency} {value:.2f}"
+
+
+def format_rate(value: Decimal) -> str:
+    formatted = format(value.normalize(), "f")
+    return formatted if "." not in formatted else formatted.rstrip("0").rstrip(".")
 
 
 def write_invoice_artifacts(
@@ -323,51 +335,67 @@ def write_invoice_artifacts(
     campaign_fee: str = "0",
     verification_unit_fee: str = "0",
     list_fee: str = "0",
+    sending_unit_fee: str = "0",
+    commission_rate: str = "0.5",
+    discount: str = "0",
+    period: str = "",
 ) -> dict[str, Any]:
     currency = (currency or "SGD").strip().upper()
     partner = partner.strip() or summary.get("client", "Partner")
+    period = period.strip() or time.strftime("%b %Y")
     campaign_amount = parse_decimal(campaign_fee)
-    verification_rate = parse_decimal(verification_unit_fee)
-    list_rate = parse_decimal(list_fee)
+    verification_rate = parse_rate(verification_unit_fee)
+    sending_rate = parse_rate(sending_unit_fee or list_fee)
+    commission_decimal = parse_rate(commission_rate)
+    discount_amount = parse_decimal(discount)
     contacts_read = int(summary.get("contacts_read", 0) or 0)
     list_count = len(summary.get("sendy_list_ids") or [])
+    setup_units = 1 if summary.get("sendy_campaign_mode") != "disabled" else 0
+    sending_units = int(summary.get("sendy_imported_contacts", 0) or 0) * max(list_count, 1)
 
     line_items = [
         {
-            "description": "EDM campaign operations and Sendy draft setup",
-            "quantity": 1,
+            "description": "Setup Cost",
+            "quantity": setup_units,
             "unit_price": campaign_amount,
-            "amount": campaign_amount,
+            "amount": (campaign_amount * setup_units).quantize(Decimal("0.01")),
         },
         {
-            "description": "Email list verification",
+            "description": "Email Cleaning",
             "quantity": contacts_read,
             "unit_price": verification_rate,
             "amount": (verification_rate * contacts_read).quantize(Decimal("0.01")),
         },
         {
-            "description": "Sendy list upload destinations",
-            "quantity": list_count,
-            "unit_price": list_rate,
-            "amount": (list_rate * list_count).quantize(Decimal("0.01")),
+            "description": "Email Sending",
+            "quantity": sending_units,
+            "unit_price": sending_rate,
+            "amount": (sending_rate * sending_units).quantize(Decimal("0.01")),
         },
     ]
-    total = sum((item["amount"] for item in line_items), Decimal("0.00")).quantize(Decimal("0.01"))
+    total = (sum((item["amount"] for item in line_items), Decimal("0.00")) - discount_amount).quantize(Decimal("0.01"))
+    commission = (total * commission_decimal).quantize(Decimal("0.01"))
+    payable = (total - commission).quantize(Decimal("0.01"))
     invoice_id = f"HE-{time.strftime('%Y%m%d-%H%M%S')}"
     invoice = {
         "invoice_id": invoice_id,
         "date": time.strftime("%Y-%m-%d"),
+        "period": period,
         "partner": partner,
         "currency": currency,
         "client": summary.get("client", ""),
         "subject": summary.get("subject", ""),
         "mode": summary.get("mode", ""),
         "contacts_read": contacts_read,
+        "sending_units": sending_units,
+        "setup_units": setup_units,
         "accepted": summary.get("accepted", 0),
         "rejected": summary.get("rejected", 0),
         "quarantined": summary.get("quarantined", 0),
         "suppressed": summary.get("suppressed", 0),
         "sendy_lists": summary.get("sendy_list_id", ""),
+        "discount": str(discount_amount),
+        "commission_rate": str(commission_decimal),
         "line_items": [
             {
                 **item,
@@ -377,29 +405,41 @@ def write_invoice_artifacts(
             for item in line_items
         ],
         "total": str(total),
+        "commission": str(commission),
+        "payable": str(payable),
     }
 
     (output_dir / "invoice.json").write_text(json.dumps(invoice, indent=2), encoding="utf-8")
     with (output_dir / "invoice_rows.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
+        writer.writerow(["Helium Emails", "", invoice_id])
         writer.writerow(["Invoice ID", invoice_id])
         writer.writerow(["Date", invoice["date"]])
+        writer.writerow(["Period", period])
         writer.writerow(["Partner", partner])
         writer.writerow(["Client", invoice["client"]])
         writer.writerow(["Campaign", invoice["subject"]])
         writer.writerow(["Mode", invoice["mode"]])
+        writer.writerow(["Blast Setup Cost per campaign", "", format_money(campaign_amount, currency)])
+        writer.writerow(["Sending Cost per email", "", format_rate(sending_rate)])
+        writer.writerow(["Cleaning Cost per email", "", format_rate(verification_rate)])
         writer.writerow([])
         writer.writerow(["Description", "Quantity", "Unit price", "Amount"])
         for item in line_items:
-            writer.writerow([item["description"], item["quantity"], format_money(item["unit_price"], currency), format_money(item["amount"], currency)])
+            unit_price = format_money(item["unit_price"], currency) if item["description"] == "Setup Cost" else format_rate(item["unit_price"])
+            writer.writerow([item["description"], item["quantity"], unit_price, format_money(item["amount"], currency)])
         writer.writerow([])
-        writer.writerow(["Total", "", "", format_money(total, currency)])
+        writer.writerow(["DISCOUNT", "", "", format_money(discount_amount, currency)])
+        writer.writerow(["Total Cost", "", "", format_money(total, currency)])
+        writer.writerow(["Commission", "", "", format_money(commission, currency)])
+        writer.writerow(["PAYABLE", "", "", format_money(payable, currency)])
+        writer.writerow([f"ALL PRICES ARE IN {currency}"])
 
     rows = "\n".join(
         "<tr>"
         f"<td>{html.escape(item['description'])}</td>"
         f"<td>{item['quantity']}</td>"
-        f"<td>{html.escape(format_money(item['unit_price'], currency))}</td>"
+        f"<td>{html.escape(format_money(item['unit_price'], currency) if item['description'] == 'Setup Cost' else format_rate(item['unit_price']))}</td>"
         f"<td>{html.escape(format_money(item['amount'], currency))}</td>"
         "</tr>"
         for item in line_items
@@ -425,6 +465,7 @@ def write_invoice_artifacts(
             <h1>Invoice {html.escape(invoice_id)}</h1>
             <div class="meta">
               <div>Date: {html.escape(invoice["date"])}</div>
+              <div>Period: {html.escape(period)}</div>
               <div>Partner: {html.escape(partner)}</div>
               <div>Client: {html.escape(str(invoice["client"]))}</div>
               <div>Campaign: {html.escape(str(invoice["subject"]))}</div>
@@ -434,7 +475,10 @@ def write_invoice_artifacts(
               <thead><tr><th>Description</th><th>Quantity</th><th>Unit price</th><th>Amount</th></tr></thead>
               <tbody>{rows}</tbody>
             </table>
-            <div class="total">Total: {html.escape(format_money(total, currency))}</div>
+            <div class="total">Total Cost: {html.escape(format_money(total, currency))}</div>
+            <div class="total">Commission: {html.escape(format_money(commission, currency))}</div>
+            <div class="total">Payable: {html.escape(format_money(payable, currency))}</div>
+            <p class="meta">ALL PRICES ARE IN {html.escape(currency)}</p>
           </body>
         </html>
         """
@@ -910,6 +954,10 @@ def process_campaign(
     invoice_campaign_fee: str = "0",
     invoice_verification_unit_fee: str = "0",
     invoice_list_fee: str = "0",
+    invoice_sending_unit_fee: str = "0",
+    invoice_commission_rate: str = "0.5",
+    invoice_discount: str = "0",
+    invoice_period: str = "",
     plan: IntakePlan | None = None,
     assessments: list[FileAssessment] | None = None,
 ) -> dict[str, Any]:
@@ -1027,11 +1075,18 @@ def process_campaign(
         campaign_fee=invoice_campaign_fee,
         verification_unit_fee=invoice_verification_unit_fee,
         list_fee=invoice_list_fee,
+        sending_unit_fee=invoice_sending_unit_fee,
+        commission_rate=invoice_commission_rate,
+        discount=invoice_discount,
+        period=invoice_period,
     )
     summary["invoice_id"] = invoice["invoice_id"]
     summary["invoice_total"] = invoice["total"]
+    summary["invoice_commission"] = invoice["commission"]
+    summary["invoice_payable"] = invoice["payable"]
     summary["invoice_currency"] = invoice["currency"]
     summary["invoice_partner"] = invoice["partner"]
+    summary["invoice_period"] = invoice["period"]
 
     write_report(
         output_dir,
@@ -1094,6 +1149,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--invoice-campaign-fee", default="0", help="Flat campaign operations fee.")
     parser.add_argument("--invoice-verification-unit-fee", default="0", help="Per-contact verification fee.")
     parser.add_argument("--invoice-list-fee", default="0", help="Per selected Sendy list upload fee.")
+    parser.add_argument("--invoice-sending-unit-fee", default="0", help="Per-email sending fee. Defaults separately from verification.")
+    parser.add_argument("--invoice-commission-rate", default="0.5", help="Commission share as a decimal. Default: 0.5.")
+    parser.add_argument("--invoice-discount", default="0", help="Invoice discount amount.")
+    parser.add_argument("--invoice-period", default="", help='Invoice period, for example "Dec 2024 - Feb 2025".')
     return parser
 
 
@@ -1189,6 +1248,10 @@ def main(argv: list[str] | None = None) -> int:
         invoice_campaign_fee=args.invoice_campaign_fee,
         invoice_verification_unit_fee=args.invoice_verification_unit_fee,
         invoice_list_fee=args.invoice_list_fee,
+        invoice_sending_unit_fee=args.invoice_sending_unit_fee,
+        invoice_commission_rate=args.invoice_commission_rate,
+        invoice_discount=args.invoice_discount,
+        invoice_period=args.invoice_period,
         plan=plan,
         assessments=assessments,
     )

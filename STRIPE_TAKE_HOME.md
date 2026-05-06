@@ -332,6 +332,8 @@ This file records:
 
 This file is designed for my existing lightweight invoicing process: import or paste the rows into a Google Sheet, then export that sheet to PDF. It includes the partner, client, campaign, counts, selected billing rates, line items, and total.
 
+I aligned it to my current Helium tracker/PDF format: invoice ID, date, period, client, setup fee, sending fee per email, cleaning fee per email, `Setup Cost`, `Email Cleaning`, `Email Sending`, `DISCOUNT`, `Total Cost`, `Commission`, and `PAYABLE`.
+
 ### `runs/latest/invoice.html`
 
 This is a printable invoice artifact for quick review. The Google Sheet remains the source for final PDF formatting, but the run now produces the structured billing data automatically.
