@@ -313,8 +313,35 @@ def title_from_html(html_text: str) -> str:
     return ""
 
 
-def render_helium_email(edm_html: str, header_html: str, footer_html: str) -> str:
-    body = "\n".join(part for part in [body_inner_html(header_html), body_inner_html(edm_html), body_inner_html(footer_html)] if part)
+def render_template_fragment(fragment: str, *, subject: str = "") -> str:
+    escaped_subject = html.escape(subject.strip())
+    return (
+        fragment.replace("{{ subject }}", escaped_subject)
+        .replace("{{subject}}", escaped_subject)
+        .replace("[[subject]]", escaped_subject)
+    )
+
+
+def has_webversion_header(html_text: str) -> bool:
+    lower_html = html_text.lower()
+    return "<webversion" in lower_html or "view the online version" in lower_html
+
+
+def has_unsubscribe_footer(html_text: str) -> bool:
+    lower_html = html_text.lower()
+    return "<unsubscribe" in lower_html or "[unsubscribe]" in lower_html or "unsubscribe here" in lower_html
+
+
+def render_helium_email(edm_html: str, header_html: str, footer_html: str, *, subject: str = "") -> str:
+    rendered_header = render_template_fragment(header_html, subject=subject)
+    rendered_footer = render_template_fragment(footer_html, subject=subject)
+    parts = []
+    if rendered_header and not has_webversion_header(edm_html):
+        parts.append(body_inner_html(rendered_header))
+    parts.append(body_inner_html(edm_html))
+    if rendered_footer and not has_unsubscribe_footer(edm_html):
+        parts.append(body_inner_html(rendered_footer))
+    body = "\n".join(part for part in parts if part)
     return (
         '<!doctype html>\n'
         '<html>\n'
@@ -322,10 +349,8 @@ def render_helium_email(edm_html: str, header_html: str, footer_html: str) -> st
         '    <meta charset="utf-8">\n'
         '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
         '  </head>\n'
-        '  <body style="margin:0; padding:0; background:#f6f7f9;">\n'
-        '    <div style="max-width:680px; margin:0 auto; background:#ffffff; font-family:Arial, sans-serif; color:#111827;">\n'
+        '  <body style="margin:0; padding:0; background:#ffffff;">\n'
         f'{body}\n'
-        '    </div>\n'
         '  </body>\n'
         '</html>\n'
     )
@@ -1108,7 +1133,7 @@ def process_campaign(
     edm_html = html_path.read_text(encoding="utf-8")
     header_html = header_path.read_text(encoding="utf-8") if header_path.exists() else ""
     footer_html = footer_path.read_text(encoding="utf-8") if footer_path.exists() else ""
-    html_text = render_helium_email(edm_html, header_html, footer_html)
+    html_text = render_helium_email(edm_html, header_html, footer_html, subject=subject)
     output_dir.mkdir(parents=True, exist_ok=True)
     rendered_html_path = output_dir / "rendered_edm.html"
     rendered_html_path.write_text(html_text, encoding="utf-8")

@@ -157,6 +157,7 @@ The build evolved in a few small steps:
 5. I added a password-protected dashboard so the operator can choose a client, upload files, see verification/Sendy service status, run the workflow, and review outputs without using CLI flags directly.
 6. I added per-client Sendy config so choosing a client can auto-fill brand/list/sender defaults while keeping API keys in `.env`.
 7. I connected the dashboard to live Sendy brand/list discovery so the operator can select the right destination instead of copying IDs by hand.
+8. I updated the ISLE wrapper to match the real edited Sendy HTML: subject preheader, `<webversion>`, `[Email]`, and `<unsubscribe>` are inserted automatically when the uploaded EDM does not already include them.
 
 The current template convention is:
 
@@ -166,6 +167,8 @@ templates/clients/<client-slug>/footer.html
 ```
 
 The agent uses `--client <client-slug>` to select the correct wrapper. If the uploaded intake folder contains a one-off `header.html` or `footer.html`, that uploaded file overrides the saved client template for that campaign.
+
+For ISLE, the saved wrapper now mirrors the production campaign edit. The header adds the campaign subject plus the Sendy online-version tag, and the footer adds the consent reminder with Sendy's `[Email]` merge field and `<unsubscribe>` tag. The renderer is idempotent, so an already-edited EDM is not wrapped twice.
 
 ### Expert Review
 

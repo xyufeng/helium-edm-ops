@@ -2,7 +2,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from helium_edm.cli import build_intake_plan, convert_xlsx_to_csvs, read_contacts
+from helium_edm.cli import build_intake_plan, convert_xlsx_to_csvs, read_contacts, render_helium_email
 
 
 def write_workbook(path: Path) -> None:
@@ -85,3 +85,36 @@ def test_read_contacts_infers_unexpected_email_column_from_values(tmp_path):
     assert contacts[0].email == "wang@example.com"
     assert contacts[0].name == "王小明"
     assert any("Inferred email column" in warning for warning in warnings)
+
+
+def test_render_helium_email_uses_isle_sendy_tags_and_subject(tmp_path):
+    header = Path("templates/clients/isle/header.html").read_text(encoding="utf-8")
+    footer = Path("templates/clients/isle/footer.html").read_text(encoding="utf-8")
+
+    rendered = render_helium_email(
+        "<html><body><p>Campaign body</p></body></html>",
+        header,
+        footer,
+        subject="Gallop into A Fortunate Year",
+    )
+
+    assert "Gallop into A Fortunate Year" in rendered
+    assert "<webversion>here to view the online version</webversion>" in rendered
+    assert "[Email]" in rendered
+    assert "<unsubscribe>unsubscribe here</unsubscribe>" in rendered
+
+
+def test_render_helium_email_does_not_duplicate_existing_sendy_wrapper():
+    edm = """
+    <html><body>
+      <p>Problems viewing this email? click <webversion>here</webversion>.</p>
+      <p>Campaign body</p>
+      <p>Please click <unsubscribe>unsubscribe here</unsubscribe>.</p>
+    </body></html>
+    """
+
+    rendered = render_helium_email(edm, "<p>{{ subject }}</p><webversion>view</webversion>", "<unsubscribe>bye</unsubscribe>", subject="Subject")
+
+    assert rendered.count("<webversion") == 1
+    assert rendered.count("<unsubscribe") == 1
+    assert "Subject" not in rendered
