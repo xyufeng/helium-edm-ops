@@ -282,6 +282,8 @@ I also added an online presentation for the recording. It is a standalone review
 https://demo.helium.sg/presentation
 ```
 
+The read-through script for recording on May 7, 2026 is in `RECORDING_SCRIPT.md`. It is structured as an approximately seven-minute walkthrough covering the workflow today, build process, debugging moment, working demo, outputs, and links.
+
 Example output summary:
 
 ```json
@@ -434,6 +436,7 @@ Main files:
 
 - `helium_edm/cli.py`
 - `README.md`
+- `RECORDING_SCRIPT.md`
 - `EXPERT_REVIEW.md`
 - `.env.example`
 - `helium_edm/dashboard.py`
