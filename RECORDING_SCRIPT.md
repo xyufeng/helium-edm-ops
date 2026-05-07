@@ -36,7 +36,7 @@ First, I receive the files from the client. Usually that means an EDM HTML file 
 
 Second, I inspect the list manually. I check whether it has an email column, remove malformed rows and duplicates, and make sure the list is consented.
 
-Third, I run verification through EmailListVerify. The result is not just pass or fail. Some statuses should be accepted, some rejected, and some quarantined for review.
+Third, I run verification through EmailListVerify. In live bulk mode, this is an asynchronous job: upload the list, store the returned file or job ID, poll the verification status, and only download results when EmailListVerify reports that the job is complete. The result is not just pass or fail. Some statuses should be accepted, some rejected, and some quarantined for review.
 
 Fourth, I wrap the EDM body with the correct client-specific header and footer. Each client or brand on helium.sg can have its own sender defaults and HTML wrapper.
 
@@ -54,7 +54,7 @@ Assess means the agent looks at the uploaded files and decides what each file is
 
 Plan means it creates a processing sequence before acting. For example, if the uploaded contact file is an XLSX workbook, it converts every non-empty sheet into a CSV first. Then it selects the generated CSV that actually contains email addresses.
 
-Act means the deterministic pipeline does the operational work: local validation, deduplication, suppression handling, EmailListVerify verification, Sendy list upload, Sendy campaign draft creation, and invoice artifact generation.
+Act means the deterministic pipeline does the operational work: local validation, deduplication, suppression handling, EmailListVerify verification, Sendy list upload, Sendy campaign draft creation, and invoice artifact generation. For EmailListVerify, the important production control loop is uploaded, processing, completed, result downloaded, then Sendy upload. Sendy is not touched until the verification result is available.
 
 Report means the run leaves behind a full audit trail: verified contacts CSV, rendered EDM HTML, run report JSON, dashboard summary, Sendy results, and invoice rows.
 
@@ -74,7 +74,7 @@ The prompt evolved as I built. My early prompt was basically a loose HTML review
 - subject suggestions
 - plain-text fallback summary
 
-The important design choice was to use AI only where judgment helps, and use deterministic code where correctness matters. File conversion, list validation, verification status handling, suppression, Sendy API calls, and invoice calculations are all deterministic.
+The important design choice was to use AI only where judgment helps, and use deterministic code where correctness matters. File conversion, list validation, verification status polling, suppression, Sendy API calls, and invoice calculations are all deterministic.
 
 ## 3:45 - 4:30 What Did Not Work
 
@@ -110,6 +110,8 @@ I confirm the consent attestation. In this business workflow, all uploaded lists
 
 For recording, I keep dry-run mode enabled. Dry-run mode does not call external APIs, but it produces the same artifacts and shows the Sendy requests it would make.
 
+In live mode, the verification section becomes a real external-service wait state. The app uploads the list to EmailListVerify, receives a job identifier, and keeps polling until the job is complete. If verification is still running, the dashboard should show verifying and not allow the Sendy upload step to proceed. If the job fails or times out, the run stops before Sendy. If it completes, the app downloads the verified results, filters accepted contacts, and only then uploads the accepted contacts into the selected Sendy lists.
+
 After processing, the dashboard links to the run report. The report shows accepted, rejected, quarantined, and suppressed contacts. It also shows the file assessment, processing plan, consent attestation, deliverability checks, campaign result, and invoice artifacts.
 
 I can open the rendered EDM to verify the client header and footer were added. I can open the verified contacts CSV to see exactly why each contact was accepted, rejected, quarantined, or suppressed. And I can open invoice rows, which are aligned to my current Google Sheet invoice workflow.
@@ -130,7 +132,7 @@ Every run writes:
 - `invoice.html`
 - `invoice.json`
 
-That means if a client asks what happened to a list, I can show exactly what the tool did. If an email was skipped, the reason is recorded. If a contact was suppressed, the suppression reason is recorded. If Sendy upload was simulated or live, the mode is recorded.
+That means if a client asks what happened to a list, I can show exactly what the tool did. If an email was skipped, the reason is recorded. If a contact was suppressed, the suppression reason is recorded. If EmailListVerify was simulated or live, the mode is recorded. If Sendy upload was simulated or live, the mode is recorded.
 
 This is important because EDM operations are easy to automate badly. The goal here is not just speed. The goal is reliable, inspectable operations.
 

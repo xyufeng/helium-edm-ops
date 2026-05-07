@@ -37,8 +37,8 @@ The current process looks roughly like this:
 2. Open the CSV manually and inspect the columns.
 3. Remove obvious bad rows, blank emails, malformed emails, and duplicates.
 4. Upload the list to EmailListVerify.
-5. Wait for the verification results.
-6. Download the cleaned list.
+5. Wait for EmailListVerify to finish processing the uploaded verification job.
+6. Download the cleaned list only after the verification job is complete.
 7. Manually prepare the accepted contacts for Sendy.
 8. Import the cleaned contacts into the right Sendy list.
 9. Open the EDM HTML and check for basic campaign issues.
@@ -95,6 +95,8 @@ I later tightened this from sample configuration into live Helium Sendy wiring: 
 
 Important safety boundary: this is an opted-in EDM operations and list hygiene tool. EmailListVerify is used to check address quality, not consent. Helium's operating assumption is that uploaded client lists have already provided consent, and the tool records an operator attestation for audit. The default outcome is a Sendy draft for human review, not an automatic blast.
 
+The EmailListVerify handoff is treated as an external asynchronous job in the production design. The safe state machine is: upload list, store the returned job or file ID, poll status, wait while processing, download the result when complete, then proceed to Sendy upload. If EmailListVerify fails or times out, the workflow stops before Sendy so unverified contacts are not imported.
+
 ## Tools Chosen
 
 ### Python CLI
@@ -125,7 +127,7 @@ Sources:
 
 ### EmailListVerify API
 
-EmailListVerify supports API-based email validation. For this prototype, I implemented one-by-one verification because it is simple to reason about in a short build window. Their official PHP repo also describes a bulk flow: upload a file, poll by file ID, then download reports when complete.
+EmailListVerify supports API-based email validation. For this prototype, I implemented one-by-one verification because it is simple to reason about in a short build window. For production bulk runs, the workflow should use their asynchronous bulk flow: upload a file, receive a file or job ID, poll by that ID until processing is complete, then download the verification report. The dashboard status should mirror those states as `uploaded -> processing -> completed -> result downloaded -> Sendy upload`.
 
 Sources:
 
@@ -158,6 +160,7 @@ The build evolved in a few small steps:
 6. I added per-client Sendy config so choosing a client can auto-fill brand/list/sender defaults while keeping API keys in `.env`.
 7. I connected the dashboard to live Sendy brand/list discovery so the operator can select the right destination instead of copying IDs by hand.
 8. I updated the ISLE wrapper to match the real edited Sendy HTML: subject preheader, `<webversion>`, `[Email]`, and `<unsubscribe>` are inserted automatically when the uploaded EDM does not already include them.
+9. I documented the EmailListVerify completion logic as an async job state machine, so the Sendy import step is explicitly gated on the verified result file being ready.
 
 The current template convention is:
 
@@ -306,7 +309,7 @@ The sample list intentionally includes:
 - One malformed email
 - One invalid email
 
-The tool removes the duplicate and malformed row before verification, accepts the two valid contacts, rejects the invalid contact, adds the selected client's header and footer to the EDM, and generates a Sendy campaign payload.
+The tool removes the duplicate and malformed row before verification, accepts the two valid contacts, rejects the invalid contact, adds the selected client's header and footer to the EDM, and generates a Sendy campaign payload. In live bulk mode, Sendy upload is gated on EmailListVerify completion: the app waits for the verification job to finish, downloads the result, then imports only accepted contacts.
 
 ## Outputs
 
