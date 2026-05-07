@@ -74,7 +74,7 @@ Live Sendy import or campaign creation requires the operator to confirm that the
 Production dashboard settings:
 
 - Set `HELIUM_ENV=production` to require an explicit `DASHBOARD_PASSWORD` and `FLASK_SECRET_KEY`.
-- Set `MAX_UPLOAD_MB` to control upload limits. The default is `25`.
+- Set `MAX_UPLOAD_MB` to control upload limits. The default is `100`.
 - Set `DASHBOARD_COOKIE_SECURE=true` when serving over HTTPS.
 
 AWS deployment:

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, flash, jsonify, redirect, render_template_string, request, send_from_directory, session, url_for
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
@@ -37,7 +38,7 @@ def create_app() -> Flask:
     load_dotenv()
     app = Flask(__name__)
     app.secret_key = env("FLASK_SECRET_KEY", "dev-secret-change-me")
-    app.config["MAX_CONTENT_LENGTH"] = int(env("MAX_UPLOAD_MB", "25")) * 1024 * 1024
+    app.config["MAX_CONTENT_LENGTH"] = int(env("MAX_UPLOAD_MB", "100")) * 1024 * 1024
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = env("DASHBOARD_COOKIE_SECURE", "").lower() == "true"
@@ -54,6 +55,12 @@ def create_app() -> Flask:
     @app.get("/healthz")
     def healthz() -> Response:
         return jsonify({"ok": True})
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def upload_too_large(_: RequestEntityTooLarge) -> Response:
+        limit_mb = int(app.config["MAX_CONTENT_LENGTH"] / 1024 / 1024)
+        flash(f"Upload is too large. The current limit is {limit_mb} MB.")
+        return redirect(url_for("dashboard"))
 
     @app.get("/presentation")
     def presentation() -> str:

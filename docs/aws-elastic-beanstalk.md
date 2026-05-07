@@ -14,7 +14,7 @@ SENDY_BASE_URL=https://helium.sg
 SENDY_API_KEY=...
 EMAILLISTVERIFY_API_KEY=...
 DASHBOARD_COOKIE_SECURE=true
-MAX_UPLOAD_MB=25
+MAX_UPLOAD_MB=100
 ```
 
 Set the Elastic Beanstalk load balancer health check path to:
