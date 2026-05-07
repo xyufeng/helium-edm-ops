@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+from openpyxl import load_workbook
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 TAG_RE = re.compile(r"<[^>]+>")
@@ -505,6 +506,50 @@ def csv_has_email_column(path: Path) -> tuple[bool, str]:
     return False, "CSV does not look like a contact list."
 
 
+def safe_sheet_slug(value: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", value.strip()).strip("-").lower()
+    return slug or "sheet"
+
+
+def worksheet_has_data(rows: list[list[Any]]) -> bool:
+    return any(any(cell not in (None, "") for cell in row) for row in rows)
+
+
+def convert_xlsx_to_csvs(path: Path, output_dir: Path | None = None) -> list[Path]:
+    output_dir = output_dir or path.parent
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    converted: list[Path] = []
+    used_names: set[str] = set()
+    try:
+        for worksheet in workbook.worksheets:
+            rows = [list(row) for row in worksheet.iter_rows(values_only=True)]
+            if not worksheet_has_data(rows):
+                continue
+            base_name = f"{path.stem}__{safe_sheet_slug(worksheet.title)}"
+            csv_name = base_name
+            suffix = 2
+            while csv_name in used_names:
+                csv_name = f"{base_name}-{suffix}"
+                suffix += 1
+            used_names.add(csv_name)
+            csv_path = output_dir / f"{csv_name}.csv"
+            with csv_path.open("w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerows(rows)
+            converted.append(csv_path)
+    finally:
+        workbook.close()
+    return converted
+
+
+def convert_xlsx_files_in_dir(input_dir: Path) -> list[Path]:
+    converted: list[Path] = []
+    for path in sorted(input_dir.iterdir()):
+        if path.is_file() and path.suffix.lower() == ".xlsx":
+            converted.extend(convert_xlsx_to_csvs(path, input_dir))
+    return converted
+
+
 def classify_file(path: Path) -> FileAssessment:
     name = path.name.lower()
     suffix = path.suffix.lower()
@@ -568,6 +613,7 @@ def build_intake_plan(input_dir: Path, subject: str, client: str, default_header
     if not input_dir.exists():
         raise ValueError(f"Input directory does not exist: {input_dir}")
 
+    converted_csvs = convert_xlsx_files_in_dir(input_dir)
     files = [path for path in sorted(input_dir.iterdir()) if path.is_file()]
     assessments = [classify_file(path) for path in files]
 
@@ -597,6 +643,7 @@ def build_intake_plan(input_dir: Path, subject: str, client: str, default_header
     footer_path = Path(footer.path) if footer else default_footer
     actions = [
         "Classify uploaded files by role.",
+        *([f"Convert {len(converted_csvs)} worksheet(s) from uploaded XLSX files into CSV files."] if converted_csvs else []),
         "Use contact CSV as the recipient list.",
         "Use EDM HTML as the campaign body.",
         f"Apply the {client} client header and footer unless uploaded files override them.",

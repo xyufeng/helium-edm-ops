@@ -270,7 +270,7 @@ The dashboard demo is:
 helium-edm-dashboard
 ```
 
-Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `export-partner`, upload the sample CSV and HTML, type campaign notes into the dashboard textarea, record the consent attestation, leave dry run enabled, and process the campaign. The dashboard saves those typed campaign notes into the run input folder as `campaign-notes.txt` so the same planner can inspect them alongside uploaded files. When Sendy is configured, the dashboard can load Sendy brands and lists, then auto-fill the selected brand ID and list ID. The dashboard also shows whether EmailListVerify and Sendy are configured, then links to the generated run report, rendered EDM, verified CSV, and JSON audit trail.
+Then open `http://127.0.0.1:5001`, sign in with `DASHBOARD_PASSWORD`, choose `export-partner`, upload the sample CSV or XLSX workbook and HTML, type campaign notes into the dashboard textarea, record the consent attestation, leave dry run enabled, and process the campaign. If a workbook is uploaded, the agent converts each non-empty sheet into a CSV and then selects the worksheet CSV that contains email addresses. The dashboard saves typed campaign notes into the run input folder as `campaign-notes.txt` so the same planner can inspect them alongside uploaded files. When Sendy is configured, the dashboard can load Sendy brands and lists, then auto-fill the selected brand ID and list ID. The dashboard also shows whether EmailListVerify and Sendy are configured, then links to the generated run report, rendered EDM, verified CSV, and JSON audit trail.
 
 If a client config exists, selecting the client also auto-fills known brand/list/sender defaults before processing.
 

@@ -102,6 +102,7 @@ helium-edm \
 The agent will:
 
 - Identify the CSV contact list
+- Convert each non-empty sheet in an uploaded `.xlsx` workbook into a CSV, then identify the worksheet CSV that contains email addresses
 - Identify the EDM HTML
 - Read the subject from campaign notes
 - Apply `templates/clients/export-partner/header.html` and `templates/clients/export-partner/footer.html`

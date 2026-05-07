@@ -27,7 +27,10 @@ from helium_edm.cli import (
 
 
 APP_TITLE = "Helium EDM Intake Agent"
-ALLOWED_EXTENSIONS = {".csv", ".html", ".htm", ".txt", ".md", ".json"}
+CONTACT_EXTENSIONS = {".csv", ".xlsx"}
+EDM_EXTENSIONS = {".html", ".htm"}
+SUPPRESSION_EXTENSIONS = {".csv", ".json"}
+OPTIONAL_EXTENSIONS = {".csv", ".html", ".htm", ".txt", ".md", ".json", ".xlsx"}
 
 
 def create_app() -> Flask:
@@ -138,10 +141,10 @@ def create_app() -> Flask:
             input_dir = output_dir / "input"
             input_dir.mkdir(parents=True, exist_ok=True)
 
-            save_upload(request.files.get("contacts"), input_dir, "contacts")
-            save_upload(request.files.get("edm"), input_dir, "edm")
+            save_upload(request.files.get("contacts"), input_dir, "contacts", CONTACT_EXTENSIONS)
+            save_upload(request.files.get("edm"), input_dir, "edm", EDM_EXTENSIONS)
             save_campaign_notes(campaign_notes, input_dir)
-            suppression_path = save_optional_upload(request.files.get("suppression"), input_dir)
+            suppression_path = save_optional_upload(request.files.get("suppression"), input_dir, allowed_extensions=SUPPRESSION_EXTENSIONS)
             if suppression_path == input_dir:
                 suppression_path = None
 
@@ -281,21 +284,28 @@ def safe_error(exc: Exception) -> str:
     return message
 
 
-def save_upload(file: FileStorage | None, input_dir: Path, label: str) -> Path:
+def save_upload(file: FileStorage | None, input_dir: Path, label: str, allowed_extensions: set[str]) -> Path:
     if not file or not file.filename:
         raise ValueError(f"Upload a {label} file.")
-    return save_optional_upload(file, input_dir, required=True)
+    return save_optional_upload(file, input_dir, required=True, allowed_extensions=allowed_extensions)
 
 
-def save_optional_upload(file: FileStorage | None, input_dir: Path, required: bool = False) -> Path:
+def save_optional_upload(
+    file: FileStorage | None,
+    input_dir: Path,
+    required: bool = False,
+    allowed_extensions: set[str] | None = None,
+) -> Path:
     if not file or not file.filename:
         if required:
             raise ValueError("Missing required upload.")
         return input_dir
     filename = secure_filename(file.filename)
     suffix = Path(filename).suffix.lower()
-    if suffix not in ALLOWED_EXTENSIONS:
-        raise ValueError(f"Unsupported file extension: {suffix}")
+    allowed = allowed_extensions or OPTIONAL_EXTENSIONS
+    if suffix not in allowed:
+        expected = ", ".join(sorted(allowed))
+        raise ValueError(f"Unsupported file extension for {filename}: {suffix}. Expected one of: {expected}")
     path = input_dir / filename
     file.save(path)
     return path
@@ -918,8 +928,8 @@ DASHBOARD_TEMPLATE = """
             <p id="sender-defaults">Loaded from the selected brand config.</p>
           </div>
           <div class="grid-two">
-            <label>Contact list CSV
-              <input name="contacts" type="file" accept=".csv" required>
+            <label>Contact list CSV or XLSX
+              <input name="contacts" type="file" accept=".csv,.xlsx" required>
             </label>
             <label>EDM HTML
               <input name="edm" type="file" accept=".html,.htm" required>
