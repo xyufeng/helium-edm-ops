@@ -2,7 +2,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from helium_edm.cli import build_intake_plan, convert_xlsx_to_csvs
+from helium_edm.cli import build_intake_plan, convert_xlsx_to_csvs, read_contacts
 
 
 def write_workbook(path: Path) -> None:
@@ -63,3 +63,25 @@ def test_build_intake_plan_classifies_generated_xlsx_sheet_csv(tmp_path):
     assert Path(plan.contacts_path).exists()
     assert any(item.path.endswith("client-list.xlsx") and item.role == "unknown" for item in assessments)
     assert any(item.path.endswith("client-list__notes.csv") and item.role == "unknown" for item in assessments)
+
+
+def test_read_contacts_accepts_chinese_email_header(tmp_path):
+    csv_path = tmp_path / "contacts.csv"
+    csv_path.write_text("姓名,电子邮件,公司\n王小明,wang@example.com,Acme\n", encoding="utf-8")
+
+    contacts, warnings = read_contacts(csv_path)
+
+    assert contacts[0].email == "wang@example.com"
+    assert contacts[0].name == "王小明"
+    assert any("电子邮件" in warning for warning in warnings)
+
+
+def test_read_contacts_infers_unexpected_email_column_from_values(tmp_path):
+    csv_path = tmp_path / "contacts.csv"
+    csv_path.write_text("姓名,主要联系方式,公司\n王小明,wang@example.com,Acme\n", encoding="utf-8")
+
+    contacts, warnings = read_contacts(csv_path)
+
+    assert contacts[0].email == "wang@example.com"
+    assert contacts[0].name == "王小明"
+    assert any("Inferred email column" in warning for warning in warnings)

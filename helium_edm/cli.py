@@ -22,6 +22,32 @@ TAG_RE = re.compile(r"<[^>]+>")
 WS_RE = re.compile(r"\s+")
 HREF_RE = re.compile(r"(?is)<a\b[^>]*\bhref=[\"']([^\"']+)[\"'][^>]*>")
 IMG_RE = re.compile(r"(?is)<img\b([^>]*)>")
+EMAIL_COLUMN_ALIASES = {
+    "email",
+    "email address",
+    "e-mail",
+    "e-mail address",
+    "mail",
+    "邮箱",
+    "电子邮件",
+    "邮件",
+    "电邮",
+    "电子邮箱",
+    "电子信箱",
+    "邮箱地址",
+    "邮件地址",
+    "电子邮件地址",
+}
+NAME_COLUMN_ALIASES = {
+    "name",
+    "full name",
+    "contact name",
+    "姓名",
+    "名字",
+    "联系人",
+    "联系人姓名",
+    "客户姓名",
+}
 PLACEHOLDER_VALUES = {
     "replace_me",
     "change_me",
@@ -109,6 +135,56 @@ def normalize_email(value: str) -> str:
     return value.strip().lower()
 
 
+def normalize_header(value: str) -> str:
+    return WS_RE.sub(" ", str(value or "").strip()).lower()
+
+
+def find_column_by_alias(fields: dict[str, str], aliases: set[str]) -> str | None:
+    for alias in aliases:
+        if alias in fields:
+            return fields[alias]
+    for normalized, original in fields.items():
+        if any(alias in normalized for alias in aliases if len(alias) >= 2):
+            return original
+    return None
+
+
+def infer_email_column_from_rows(fieldnames: list[str], rows: list[dict[str, str]]) -> str | None:
+    scores: dict[str, int] = {field: 0 for field in fieldnames}
+    for row in rows[:25]:
+        for field in fieldnames:
+            value = normalize_email(str(row.get(field, "")))
+            if EMAIL_RE.match(value):
+                scores[field] += 1
+    best_field, best_score = max(scores.items(), key=lambda item: item[1])
+    return best_field if best_score > 0 else None
+
+
+def resolve_contact_columns(
+    fieldnames: list[str],
+    rows: list[dict[str, str]],
+    email_column: str = "email",
+    name_column: str = "name",
+) -> tuple[str | None, str | None, str]:
+    fields = {normalize_header(field): field for field in fieldnames}
+    email_field = fields.get(normalize_header(email_column))
+    reason = ""
+    if not email_field:
+        email_field = find_column_by_alias(fields, EMAIL_COLUMN_ALIASES)
+        if email_field:
+            reason = f"Matched email column alias '{email_field}'."
+    if not email_field:
+        email_field = infer_email_column_from_rows(fieldnames, rows)
+        if email_field:
+            reason = f"Inferred email column '{email_field}' from email-shaped cell values."
+
+    name_field = fields.get(normalize_header(name_column)) or find_column_by_alias(fields, NAME_COLUMN_ALIASES)
+    if not name_field:
+        candidates = [field for field in fieldnames if field != email_field]
+        name_field = candidates[0] if candidates else None
+    return email_field, name_field, reason
+
+
 def read_contacts(csv_path: Path, email_column: str = "email", name_column: str = "name") -> tuple[list[Contact], list[str]]:
     warnings: list[str] = []
     contacts: list[Contact] = []
@@ -118,16 +194,19 @@ def read_contacts(csv_path: Path, email_column: str = "email", name_column: str 
         if not reader.fieldnames:
             raise ValueError("CSV has no header row.")
 
-        fields = {field.strip().lower(): field for field in reader.fieldnames}
-        email_field = fields.get(email_column.lower())
-        name_field = fields.get(name_column.lower())
+        rows = list(reader)
+        email_field, name_field, column_reason = resolve_contact_columns(reader.fieldnames, rows, email_column, name_column)
 
         if not email_field:
             possible = ", ".join(reader.fieldnames)
-            raise ValueError(f"Email column '{email_column}' not found. Available columns: {possible}")
+            raise ValueError(
+                f"Email column '{email_column}' not found and no email-like values were detected. Available columns: {possible}"
+            )
+        if column_reason:
+            warnings.append(column_reason)
 
         seen: set[str] = set()
-        for row_number, row in enumerate(reader, start=2):
+        for row_number, row in enumerate(rows, start=2):
             email_address = normalize_email(row.get(email_field, ""))
             name = (row.get(name_field, "") if name_field else "").strip()
 
@@ -491,14 +570,13 @@ def write_invoice_artifacts(
 def csv_has_email_column(path: Path) -> tuple[bool, str]:
     try:
         with path.open(newline="", encoding="utf-8-sig") as f:
-            reader = csv.reader(f)
-            header = next(reader, [])
-            normalized = [item.strip().lower() for item in header]
-            if "email" in normalized or "email address" in normalized or "e-mail" in normalized:
-                return True, "CSV header contains an email column."
-            sample = "\n".join(",".join(row) for _, row in zip(range(8), reader))
-            if re.search(r"[^@\s]+@[^@\s]+\.[^@\s]+", sample):
-                return True, "CSV sample contains email addresses."
+            reader = csv.DictReader(f)
+            if not reader.fieldnames:
+                return False, "CSV has no header row."
+            rows = [row for _, row in zip(range(25), reader)]
+            email_field, _, reason = resolve_contact_columns(reader.fieldnames, rows)
+            if email_field:
+                return True, reason or f"Detected email column '{email_field}'."
     except UnicodeDecodeError:
         return False, "Could not read as UTF-8 CSV."
     except OSError as exc:
